@@ -1,0 +1,17 @@
+{
+  "name": "@thermocycler/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Motor del simulador de termociclador: conocimiento, reglas, cálculo, validación de protocolos y simulación",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "npm run build && node --test dist",
+    "demo": "npm run build && node dist/demo.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  }
+}
