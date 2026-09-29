@@ -18,6 +18,7 @@ export interface EditorPhase {
 }
 
 export interface EditorState {
+  name: string;
   initial: EditorPhase;
   cycleCount: number;
   steps: EditorStep[];
@@ -34,8 +35,9 @@ export const newStepId = (): string =>
 
 type StepSpec = [type: StepType, temperature: number, durationSeconds: number];
 
-function makeState(cycleCount: number, initialSeconds: number, finalSeconds: number, steps: StepSpec[]): EditorState {
+function makeState(name: string, cycleCount: number, initialSeconds: number, finalSeconds: number, steps: StepSpec[]): EditorState {
   return {
+    name,
     initial: { enabled: true, temperature: 95, durationSeconds: initialSeconds },
     cycleCount,
     steps: steps.map(([type, temperature, durationSeconds]) => ({ id: newStepId(), type, temperature, durationSeconds })),
@@ -46,7 +48,7 @@ function makeState(cycleCount: number, initialSeconds: number, finalSeconds: num
 
 // Por defecto, el ejemplo de la sección 5 de la spec.
 export const defaultEditorState = (): EditorState =>
-  makeState(35, 180, 300, [
+  makeState('PCR estándar', 35, 180, 300, [
     ['denaturation', 95, 30],
     ['annealing', 60, 30],
     ['extension', 72, 45],
@@ -59,13 +61,13 @@ export const PROTOCOL_PRESETS: { id: string; name: string; description: string; 
     id: 'fast-2-step',
     name: 'PCR rápida',
     description: '2 pasos · 30 ciclos',
-    build: () => makeState(30, 120, 120, [['denaturation', 98, 10], ['extension', 68, 30]]),
+    build: () => makeState('PCR rápida', 30, 120, 120, [['denaturation', 98, 10], ['extension', 68, 30]]),
   },
   {
     id: 'colony',
     name: 'PCR de colonia',
     description: 'lisis larga · 30 ciclos',
-    build: () => makeState(30, 600, 600, [['denaturation', 95, 30], ['annealing', 55, 30], ['extension', 72, 60]]),
+    build: () => makeState('PCR de colonia', 30, 600, 600, [['denaturation', 95, 30], ['annealing', 55, 30], ['extension', 72, 60]]),
   },
 ];
 
@@ -80,6 +82,7 @@ const fromPhase = (p: ProtocolPhase | undefined, fallback: EditorPhase): EditorP
 export function buildProtocol(state: EditorState): Protocol {
   return {
     id: 'editor-protocol',
+    nombre: state.name.trim() || 'Sin nombre',
     initial: toPhase(state.initial),
     cycles: { count: state.cycleCount, steps: state.steps.map(({ id: _id, ...step }) => step) },
     finalExtension: toPhase(state.finalExtension),
@@ -90,6 +93,7 @@ export function buildProtocol(state: EditorState): Protocol {
 export function protocolToEditorState(protocol: Protocol): EditorState {
   const fallback = defaultEditorState();
   return {
+    name: protocol.nombre ?? 'Protocolo importado',
     initial: fromPhase(protocol.initial, fallback.initial),
     cycleCount: protocol.cycles.count,
     steps: protocol.cycles.steps.map(step => ({ ...step, id: newStepId() })),
