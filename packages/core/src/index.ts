@@ -1,10 +1,9 @@
-// Punto de entrada del paquete. Todo lo que use packages/web (o
-// cualquier otro consumidor futuro: una CLI, otra UI...) debería poder
-// importarlo desde aquí, sin tener que conocer la estructura interna
-// de carpetas.
+// API pública del paquete: cualquier consumidor (la web, una CLI...)
+// importa desde aquí sin conocer la estructura interna de carpetas.
 
 export * from './types/common';
 
+/* ---------- Conocimiento ---------- */
 export * from './knowledge/entities/primer';
 export * from './knowledge/entities/polymerase';
 export * from './knowledge/entities/buffer';
@@ -13,31 +12,29 @@ export * from './knowledge/entities/assay';
 export * from './knowledge/entities/protocol';
 export * from './knowledge/entities/rule';
 export * from './knowledge/relationships';
-export { KnowledgeBase } from './knowledge/knowledge-base';
-export { buildDemoKnowledgeBase } from './knowledge/seed-data';
+export * from './knowledge/knowledge-base';
+export * from './knowledge/seed-data';
 
+/* ---------- Reglas ---------- */
 export * from './rules/condition';
 export * from './rules/action';
-export { RuleEngine } from './rules/engine';
-export type { RuleEngineResult, RuleTraceEntry } from './rules/engine';
+export * from './rules/engine';
 export * from './rules/definitions/example-rules';
 
+/* ---------- Cálculo ---------- */
 export * from './calculations/types';
-export { calculateLength, calculateGcContent } from './calculations/primer-analysis';
-export { calculateTm, calculateAnnealingTemperatureRange } from './calculations/thermodynamics';
-export type { AnnealingRange } from './calculations/thermodynamics';
-export { validateProtocol, calculateTotalRuntime } from './calculations/protocol-analysis';
-export type { ValidationIssue, ValidationResult } from './calculations/protocol-analysis';
-export { CalculationResolver } from './calculations/resolver';
-export { buildDefaultCalculationResolver } from './calculations/default-registry';
+export * from './calculations/primer-analysis';
+export * from './calculations/thermodynamics';
+export * from './calculations/protocol-analysis';
+export * from './calculations/resolver';
+export * from './calculations/default-registry';
 
-export { parseProtocolJson } from './protocols/parser';
-export type { ParseError, ParseResult } from './protocols/parser';
-export { compareProtocols } from './protocols/validator';
+/* ---------- Protocolos ---------- */
 export * from './protocols/types';
+export * from './protocols/parser';
+export * from './protocols/validator';
 
-export { SimulationController } from './simulation/state-machine';
-export type { SimulationSpeed } from './simulation/state-machine';
-export { resolveTiming } from './simulation/timing';
-export type { TimingResult } from './simulation/timing';
+/* ---------- Simulación ---------- */
 export * from './simulation/types';
+export * from './simulation/timing';
+export * from './simulation/state-machine';

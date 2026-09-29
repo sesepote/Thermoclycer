@@ -41,11 +41,3 @@ export interface SourcedValue<T> {
   confidence?: Confidence;
   warnings?: string[];
 }
-
-export function sourcedValue<T>(
-  value: T,
-  origin: SourceType,
-  opts: Partial<Omit<SourcedValue<T>, 'value' | 'origin'>> = {},
-): SourcedValue<T> {
-  return { value, origin, ...opts };
-}

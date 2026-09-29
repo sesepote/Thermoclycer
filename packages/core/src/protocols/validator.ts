@@ -1,228 +1,141 @@
-import { Protocol, ProtocolCycles, ProtocolPhase, ProtocolStep } from '../knowledge/entities/protocol';
-import {
-  DEFAULT_TOLERANCE,
-  ErrorType,
-  ParameterComparison,
-  ParameterStatus,
-  ProtocolTolerance,
-  StepTolerance,
-} from './types';
+import { Protocol, ProtocolPhase, ProtocolStep } from '../knowledge/entities/protocol';
+import { DEFAULT_TOLERANCE, ErrorType, ParameterComparison, ParameterStatus, ProtocolTolerance, StepTolerance } from './types';
 
-// Este módulo no calcula ninguna nota ni decide si el ejercicio está
-// "aprobado": eso es trabajo del evaluador (Fase 7), que pondera estas
-// comparaciones según sus propios pesos. Aquí solo se compara, campo a
-// campo, un protocolo candidato contra uno esperado, y se dice qué
-// pasó con cada uno usando el vocabulario de las secciones 11 y 15.
+// Compara campo a campo un protocolo candidato con uno esperado usando
+// el vocabulario de las secciones 11 y 15. No pone nota: ponderar estas
+// comparaciones es trabajo del evaluador (Fase 7).
 
-function classify(
-  diff: number,
-  tolerance: number | undefined,
-  highType: ErrorType,
-  lowType: ErrorType,
-): { status: ParameterStatus; errorType?: ErrorType } {
-  if (diff === 0) return { status: 'EXACT' };
-  const tol = tolerance ?? 0;
-  if (Math.abs(diff) <= tol) return { status: 'ACCEPTED_RANGE' };
-  return { status: 'OUT_OF_RANGE', errorType: diff > 0 ? highType : lowType };
+type Out = ParameterComparison[];
+
+/* ---------- Comparación numérica genérica ---------- */
+
+interface FieldSpec {
+  what: 'temperatura' | 'duración';
+  unit: string;
+  errors: [high: ErrorType, low: ErrorType];
 }
 
-function comparePhase(
-  name: string,
-  expected: ProtocolPhase | undefined,
-  candidate: ProtocolPhase | undefined,
-  tolerance: StepTolerance | undefined,
-  out: ParameterComparison[],
-): void {
-  if (expected === undefined && candidate === undefined) return;
+const TEMPERATURE: FieldSpec = { what: 'temperatura', unit: '°C', errors: ['TEMPERATURE_TOO_HIGH', 'TEMPERATURE_TOO_LOW'] };
+const DURATION: FieldSpec = { what: 'duración', unit: 's', errors: ['TIME_TOO_LONG', 'TIME_TOO_SHORT'] };
 
-  if (expected === undefined && candidate !== undefined) {
-    out.push({
-      name,
-      status: 'INVALID',
-      errorType: 'EXTRA_STEP',
-      message: `se incluyó "${name}" pero el protocolo de referencia no la contempla`,
-    });
+function classify(diff: number, tolerance = 0, [high, low]: [ErrorType, ErrorType]) {
+  if (diff === 0) return { status: 'EXACT' as ParameterStatus };
+  if (Math.abs(diff) <= tolerance) return { status: 'ACCEPTED_RANGE' as ParameterStatus };
+  return { status: 'OUT_OF_RANGE' as ParameterStatus, errorType: diff > 0 ? high : low };
+}
+
+function compareField(out: Out, phase: string, key: string, user: number, expected: number, tol: number | undefined, spec: FieldSpec) {
+  const { status, errorType } = classify(user - expected, tol, spec.errors);
+  const u = `${user}${spec.unit}`;
+  const e = `${expected}${spec.unit}`;
+  const message = {
+    EXACT: `${phase}: ${spec.what} correcta (${u})`,
+    ACCEPTED_RANGE: `${phase}: ${spec.what} aceptable (${u}, referencia ${e})`,
+    OUT_OF_RANGE: `${phase}: ${spec.what} fuera de rango (${u}, se esperaba ${e})`,
+  }[status as 'EXACT' | 'ACCEPTED_RANGE' | 'OUT_OF_RANGE'];
+
+  out.push({
+    name: `${phase}.${key}`,
+    status,
+    errorType,
+    userValue: user,
+    expectedValue: expected,
+    expectedRange: tol ? { min: expected - tol, max: expected + tol } : undefined,
+    message,
+  });
+}
+
+/* ---------- Fases (inicial, pasos del ciclo, extensión final) ---------- */
+
+function comparePhase(out: Out, name: string, e: ProtocolPhase | undefined, c: ProtocolPhase | undefined, tol?: StepTolerance) {
+  if (!e && !c) return;
+  if (!e) {
+    out.push({ name, status: 'INVALID', errorType: 'EXTRA_STEP', message: `se incluyó "${name}" pero el protocolo de referencia no la contempla` });
     return;
   }
-
-  if (expected !== undefined && candidate === undefined) {
+  if (!c) {
     out.push({ name, status: 'MISSING', errorType: 'MISSING_STEP', message: `falta la fase "${name}"` });
     return;
   }
-
-  const e = expected as ProtocolPhase;
-  const c = candidate as ProtocolPhase;
-
-  const temp = classify(c.temperature - e.temperature, tolerance?.temperatureToleranceC, 'TEMPERATURE_TOO_HIGH', 'TEMPERATURE_TOO_LOW');
-  out.push({
-    name: `${name}.temperature`,
-    status: temp.status,
-    userValue: c.temperature,
-    expectedValue: e.temperature,
-    expectedRange: tolerance?.temperatureToleranceC
-      ? { min: e.temperature - tolerance.temperatureToleranceC, max: e.temperature + tolerance.temperatureToleranceC }
-      : undefined,
-    errorType: temp.errorType,
-    message:
-      temp.status === 'EXACT'
-        ? `${name}: temperatura correcta (${c.temperature}°C)`
-        : temp.status === 'ACCEPTED_RANGE'
-          ? `${name}: temperatura aceptable (${c.temperature}°C, referencia ${e.temperature}°C)`
-          : `${name}: temperatura fuera de rango (${c.temperature}°C, se esperaba ${e.temperature}°C)`,
-  });
-
-  const dur = classify(c.durationSeconds - e.durationSeconds, tolerance?.durationToleranceSeconds, 'TIME_TOO_LONG', 'TIME_TOO_SHORT');
-  out.push({
-    name: `${name}.durationSeconds`,
-    status: dur.status,
-    userValue: c.durationSeconds,
-    expectedValue: e.durationSeconds,
-    expectedRange: tolerance?.durationToleranceSeconds
-      ? { min: e.durationSeconds - tolerance.durationToleranceSeconds, max: e.durationSeconds + tolerance.durationToleranceSeconds }
-      : undefined,
-    errorType: dur.errorType,
-    message:
-      dur.status === 'EXACT'
-        ? `${name}: duración correcta (${c.durationSeconds}s)`
-        : dur.status === 'ACCEPTED_RANGE'
-          ? `${name}: duración aceptable (${c.durationSeconds}s, referencia ${e.durationSeconds}s)`
-          : `${name}: duración fuera de rango (${c.durationSeconds}s, se esperaban ${e.durationSeconds}s)`,
-  });
+  compareField(out, name, 'temperature', c.temperature, e.temperature, tol?.temperatureToleranceC, TEMPERATURE);
+  compareField(out, name, 'durationSeconds', c.durationSeconds, e.durationSeconds, tol?.durationToleranceSeconds, DURATION);
 }
 
-function compareCycleCount(expected: ProtocolCycles, candidate: ProtocolCycles, out: ParameterComparison[]): void {
-  // La spec es explícita (sección 11): el número de ciclos no suele
-  // admitir tolerancia, a diferencia de una temperatura.
-  const result = classify(candidate.count - expected.count, 0, 'CYCLE_COUNT_TOO_HIGH', 'CYCLE_COUNT_TOO_LOW');
-  out.push({
-    name: 'cycles.count',
-    status: result.status,
-    userValue: candidate.count,
-    expectedValue: expected.count,
-    errorType: result.errorType,
-    message:
-      result.status === 'EXACT'
-        ? `número de ciclos correcto (${candidate.count})`
-        : `número de ciclos incorrecto: ${candidate.count} (se esperaban ${expected.count})`,
-  });
+/* ---------- Pasos del ciclo ---------- */
+
+const stepKey = (s: ProtocolStep) => (s.type === 'custom' ? `custom:${s.label ?? ''}` : s.type);
+
+// ¿Mismos tipos de paso con las mismas repeticiones, sin importar el orden?
+function sameTypeMultiset(a: ProtocolStep[], b: ProtocolStep[]): boolean {
+  const counts = new Map<string, number>();
+  for (const s of a) counts.set(stepKey(s), (counts.get(stepKey(s)) ?? 0) + 1);
+  for (const s of b) counts.set(stepKey(s), (counts.get(stepKey(s)) ?? 0) - 1);
+  return [...counts.values()].every(n => n === 0);
 }
 
-function stepTypesEqual(a: ProtocolStep, b: ProtocolStep): boolean {
-  if (a.type !== b.type) return false;
-  return a.type === 'custom' ? a.label === b.label : true;
-}
-
-function stepKey(s: ProtocolStep): string {
-  return s.type === 'custom' ? `custom:${s.label ?? ''}` : s.type;
-}
-
-function isSameTypeMultiset(a: ProtocolStep[], b: ProtocolStep[]): boolean {
-  const countsA = new Map<string, number>();
-  for (const s of a) countsA.set(stepKey(s), (countsA.get(stepKey(s)) ?? 0) + 1);
-  const countsB = new Map<string, number>();
-  for (const s of b) countsB.set(stepKey(s), (countsB.get(stepKey(s)) ?? 0) + 1);
-  if (countsA.size !== countsB.size) return false;
-  for (const [key, count] of countsA) if (countsB.get(key) !== count) return false;
-  return true;
-}
-
-function compareSteps(
-  expected: ProtocolStep[],
-  candidate: ProtocolStep[],
-  tolerance: StepTolerance | undefined,
-  out: ParameterComparison[],
-): void {
+function compareSteps(out: Out, expected: ProtocolStep[], candidate: ProtocolStep[], tol?: StepTolerance) {
   const sameLength = expected.length === candidate.length;
-  const inSameOrder = sameLength && expected.every((step, i) => stepTypesEqual(step, candidate[i]));
+  const sameOrder = sameLength && expected.every((s, i) => stepKey(s) === stepKey(candidate[i]));
 
-  if (sameLength && !inSameOrder && isSameTypeMultiset(expected, candidate)) {
-    out.push({
-      name: 'cycles.steps',
-      status: 'INVALID',
-      errorType: 'WRONG_ORDER',
-      message: 'los pasos del ciclo están todos presentes pero en un orden distinto al esperado',
-    });
+  if (sameLength && !sameOrder && sameTypeMultiset(expected, candidate)) {
+    out.push({ name: 'cycles.steps', status: 'INVALID', errorType: 'WRONG_ORDER', message: 'los pasos del ciclo están todos presentes pero en un orden distinto al esperado' });
     return;
   }
 
-  const minLength = Math.min(expected.length, candidate.length);
-  for (let i = 0; i < minLength; i++) {
+  const longest = Math.max(expected.length, candidate.length);
+  for (let i = 0; i < longest; i++) {
+    const name = `cycles.steps[${i}]`;
     const e = expected[i];
     const c = candidate[i];
-    if (!stepTypesEqual(e, c)) {
-      out.push({
-        name: `cycles.steps[${i}]`,
-        status: 'INVALID',
-        errorType: 'INCOMPATIBLE_PARAMETER',
-        message: `en la posición ${i} se esperaba un paso de tipo "${e.type}" y hay uno de tipo "${c.type}"`,
-      });
-      continue;
+    if (!c) {
+      out.push({ name, status: 'MISSING', errorType: 'MISSING_STEP', message: `falta el paso ${i} del ciclo (tipo esperado: "${e.type}")` });
+    } else if (!e) {
+      out.push({ name, status: 'INVALID', errorType: 'EXTRA_STEP', message: `hay un paso de más en la posición ${i} que el protocolo de referencia no contempla` });
+    } else if (stepKey(e) !== stepKey(c)) {
+      out.push({ name, status: 'INVALID', errorType: 'INCOMPATIBLE_PARAMETER', message: `en la posición ${i} se esperaba un paso de tipo "${e.type}" y hay uno de tipo "${c.type}"` });
+    } else {
+      comparePhase(out, name, e, c, tol);
     }
-    comparePhase(`cycles.steps[${i}]`, e, c, tolerance, out);
-  }
-
-  for (let i = minLength; i < expected.length; i++) {
-    out.push({
-      name: `cycles.steps[${i}]`,
-      status: 'MISSING',
-      errorType: 'MISSING_STEP',
-      message: `falta el paso ${i} del ciclo (tipo esperado: "${expected[i].type}")`,
-    });
-  }
-  for (let i = minLength; i < candidate.length; i++) {
-    out.push({
-      name: `cycles.steps[${i}]`,
-      status: 'INVALID',
-      errorType: 'EXTRA_STEP',
-      message: `hay un paso de más en la posición ${i} que el protocolo de referencia no contempla`,
-    });
   }
 }
 
-function compareHold(
-  expected: { temperature: number } | undefined,
-  candidate: { temperature: number } | undefined,
-  out: ParameterComparison[],
-): void {
-  if (expected === undefined && candidate === undefined) return;
+/* ---------- Hold (fase menos crítica: una diferencia se informa pero no penaliza) ---------- */
 
-  if (expected === undefined && candidate !== undefined) {
-    out.push({ name: 'hold', status: 'NOT_APPLICABLE', message: 'se incluyó un hold que el protocolo de referencia no define' });
-    return;
-  }
-  if (expected !== undefined && candidate === undefined) {
-    out.push({ name: 'hold', status: 'MISSING', errorType: 'MISSING_STEP', message: 'falta la fase de hold' });
-    return;
-  }
-
-  const e = expected as { temperature: number };
-  const c = candidate as { temperature: number };
-  // El hold es la fase menos crítica: casi cualquier temperatura de
-  // conservación razonable vale, así que una diferencia se informa
-  // pero no se marca como fuera de rango.
-  const status: ParameterStatus = e.temperature === c.temperature ? 'EXACT' : 'ACCEPTED_RANGE';
+function compareHold(out: Out, e?: { temperature: number }, c?: { temperature: number }) {
+  if (!e && !c) return;
+  if (!e) return void out.push({ name: 'hold', status: 'NOT_APPLICABLE', message: 'se incluyó un hold que el protocolo de referencia no define' });
+  if (!c) return void out.push({ name: 'hold', status: 'MISSING', errorType: 'MISSING_STEP', message: 'falta la fase de hold' });
+  const exact = e.temperature === c.temperature;
   out.push({
     name: 'hold.temperature',
-    status,
+    status: exact ? 'EXACT' : 'ACCEPTED_RANGE',
     userValue: c.temperature,
     expectedValue: e.temperature,
-    message:
-      status === 'EXACT'
-        ? `hold correcto (${c.temperature}°C)`
-        : `hold en ${c.temperature}°C (referencia ${e.temperature}°C, no suele ser crítico)`,
+    message: exact ? `hold correcto (${c.temperature}°C)` : `hold en ${c.temperature}°C (referencia ${e.temperature}°C, no suele ser crítico)`,
   });
 }
 
-export function compareProtocols(
-  expected: Protocol,
-  candidate: Protocol,
-  tolerance: ProtocolTolerance = DEFAULT_TOLERANCE,
-): ParameterComparison[] {
-  const out: ParameterComparison[] = [];
-  comparePhase('initial', expected.initial, candidate.initial, tolerance.initial, out);
-  compareCycleCount(expected.cycles, candidate.cycles, out);
-  compareSteps(expected.cycles.steps, candidate.cycles.steps, tolerance.cycleSteps, out);
-  comparePhase('final_extension', expected.finalExtension, candidate.finalExtension, tolerance.finalExtension, out);
-  compareHold(expected.hold, candidate.hold, out);
+/* ---------- Punto de entrada ---------- */
+
+export function compareProtocols(expected: Protocol, candidate: Protocol, tolerance: ProtocolTolerance = DEFAULT_TOLERANCE): ParameterComparison[] {
+  const out: Out = [];
+  comparePhase(out, 'initial', expected.initial, candidate.initial, tolerance.initial);
+
+  // El número de ciclos no admite tolerancia (sección 11).
+  const count = classify(candidate.cycles.count - expected.cycles.count, 0, ['CYCLE_COUNT_TOO_HIGH', 'CYCLE_COUNT_TOO_LOW']);
+  out.push({
+    name: 'cycles.count',
+    ...count,
+    userValue: candidate.cycles.count,
+    expectedValue: expected.cycles.count,
+    message:
+      count.status === 'EXACT'
+        ? `número de ciclos correcto (${candidate.cycles.count})`
+        : `número de ciclos incorrecto: ${candidate.cycles.count} (se esperaban ${expected.cycles.count})`,
+  });
+
+  compareSteps(out, expected.cycles.steps, candidate.cycles.steps, tolerance.cycleSteps);
+  comparePhase(out, 'final_extension', expected.finalExtension, candidate.finalExtension, tolerance.finalExtension);
+  compareHold(out, expected.hold, candidate.hold);
   return out;
 }

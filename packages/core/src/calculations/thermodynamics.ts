@@ -1,50 +1,32 @@
 import { Primer } from '../knowledge/entities/primer';
-import { CalculationResult, calculated, notCalculable } from './types';
-import { calculateGcContent, calculateLength } from './primer-analysis';
+import { CalculationResult, calculated, notCalculable, round1 } from './types';
+import { analyzeSequence } from './primer-analysis';
 
-// Umbral clásico de la regla de Wallace: por debajo de esto se usa esa
-// fórmula, por encima una basada en %GC. Ninguna de las dos sustituye
-// una Tm medida experimentalmente o dada por el fabricante del primer:
-// por eso se marcan siempre con confidence 'low' y con warnings.
+// Umbral clásico de la regla de Wallace: por debajo se usa esa fórmula,
+// por encima una basada en %GC. Ninguna sustituye una Tm experimental o
+// del fabricante, por eso se marcan con confidence 'low' y warnings.
 const WALLACE_THRESHOLD_NT = 14;
+const SALT_WARNING = 'no tiene en cuenta la concentración de sales ni la de primer';
 
 export function calculateTm(sequence: string): CalculationResult<number> {
-  const lengthResult = calculateLength(sequence);
-  if (!lengthResult.ok) return lengthResult;
-  const gcResult = calculateGcContent(sequence);
-  if (!gcResult.ok) return gcResult;
-
-  const bases = sequence.trim().toUpperCase();
-  const length = lengthResult.result.value;
+  const a = analyzeSequence(sequence);
+  if (!a.ok) return notCalculable(a.reason);
+  const { length, gc, at } = a.stats;
 
   if (length < WALLACE_THRESHOLD_NT) {
-    const at = [...bases].filter(b => b === 'A' || b === 'T').length;
-    const gc = [...bases].filter(b => b === 'G' || b === 'C').length;
-    const tm = 2 * at + 4 * gc;
-
-    return calculated(tm, {
+    return calculated(2 * at + 4 * gc, {
       unit: 'C',
       method: 'regla de Wallace: 2×(A+T) + 4×(G+C), para oligos cortos',
       confidence: 'low',
-      warnings: [
-        'estimación simplificada pensada para primers muy cortos (<14 nt)',
-        'no tiene en cuenta la concentración de sales ni la de primer',
-      ],
+      warnings: ['estimación simplificada pensada para primers muy cortos (<14 nt)', SALT_WARNING],
     });
   }
 
-  const gcPercent = gcResult.result.value;
-  const gcCount = (gcPercent / 100) * length;
-  const tm = 64.9 + (41 * (gcCount - 16.4)) / length;
-
-  return calculated(Math.round(tm * 10) / 10, {
+  return calculated(round1(64.9 + (41 * (gc - 16.4)) / length), {
     unit: 'C',
     method: 'fórmula basada en %GC: 64.9 + 41×(nGC−16.4)/N',
     confidence: 'low',
-    warnings: [
-      'estimación simplificada, no tiene en cuenta sales ni concentración de primer',
-      'para un valor fiable, usar la ficha del fabricante o un calculador de oligos dedicado',
-    ],
+    warnings: [SALT_WARNING, 'para un valor fiable, usar la ficha del fabricante o un calculador de oligos dedicado'],
   });
 }
 
@@ -54,34 +36,24 @@ export interface AnnealingRange {
   max: number;
 }
 
-// Regla práctica habitual: la temperatura de annealing se empieza a
-// probar en (Tm más baja de los dos primers) − 5°C, con un margen de
-// ±2°C alrededor para el gradiente. No es un cálculo exacto: es punto
-// de partida razonable, así se marca en el resultado.
+// Regla práctica: la annealing se empieza a probar en (Tm más baja de
+// los dos primers) − 5 °C, con ±2 °C de margen para el gradiente.
 export function calculateAnnealingTemperatureRange(
-  primerForward: Primer,
-  primerReverse: Primer,
+  primerForward: Pick<Primer, 'secuencia'>,
+  primerReverse: Pick<Primer, 'secuencia'>,
 ): CalculationResult<AnnealingRange> {
-  const tmForward = calculateTm(primerForward.secuencia);
-  if (!tmForward.ok) {
-    return notCalculable(`no se pudo calcular la Tm del primer forward: ${tmForward.reason}`);
-  }
-  const tmReverse = calculateTm(primerReverse.secuencia);
-  if (!tmReverse.ok) {
-    return notCalculable(`no se pudo calcular la Tm del primer reverse: ${tmReverse.reason}`);
-  }
+  const tmF = calculateTm(primerForward.secuencia);
+  if (!tmF.ok) return notCalculable(`no se pudo calcular la Tm del primer forward: ${tmF.reason}`);
+  const tmR = calculateTm(primerReverse.secuencia);
+  if (!tmR.ok) return notCalculable(`no se pudo calcular la Tm del primer reverse: ${tmR.reason}`);
 
-  const lowerTm = Math.min(tmForward.result.value, tmReverse.result.value);
-  const recommended = Math.round((lowerTm - 5) * 10) / 10;
-
+  const recommended = round1(Math.min(tmF.result.value, tmR.result.value) - 5);
   return calculated(
-    { recommended, min: Math.round((recommended - 2) * 10) / 10, max: Math.round((recommended + 2) * 10) / 10 },
+    { recommended, min: round1(recommended - 2), max: round1(recommended + 2) },
     {
       method: 'Tm más baja de los dos primers, menos 5°C, con margen ±2°C',
       confidence: 'low',
-      warnings: [
-        'heurística habitual de diseño de PCR, no sustituye un gradiente de annealing experimental',
-      ],
+      warnings: ['heurística habitual de diseño de PCR, no sustituye un gradiente de annealing experimental'],
     },
   );
 }

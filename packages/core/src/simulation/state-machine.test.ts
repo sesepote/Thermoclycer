@@ -80,3 +80,26 @@ test('stop reinicia el tiempo transcurrido', () => {
   assert.equal(snap.state, 'STOPPED');
   assert.equal(snap.elapsedSeconds, 0);
 });
+
+test('tras detener o completar, play vuelve a empezar desde cero', () => {
+  const controller = new SimulationController();
+  controller.program(protocoloValido());
+  controller.play();
+  controller.tick(100);
+  assert.equal(controller.snapshot().state, 'COMPLETED');
+  controller.play();
+  assert.equal(controller.snapshot().state, 'RUNNING');
+  assert.equal(controller.snapshot().elapsedSeconds, 0);
+
+  controller.tick(5);
+  controller.stop();
+  controller.play();
+  assert.equal(controller.snapshot().state, 'RUNNING');
+  assert.equal(controller.snapshot().elapsedSeconds, 0);
+});
+
+test('play sin protocolo programado no hace nada', () => {
+  const controller = new SimulationController();
+  controller.play();
+  assert.equal(controller.snapshot().state, 'IDLE');
+});

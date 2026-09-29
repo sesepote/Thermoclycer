@@ -1,27 +1,25 @@
-// Nada del otro mundo: leer/escribir "a.b.c" sobre un objeto. Se usa
-// tanto en las condiciones (leer un hecho) como en las acciones
-// (escribir el resultado de una regla). No hace falta traer lodash
-// para esto.
+// Lectura/escritura de rutas "a.b.c" sobre un objeto, usadas por
+// condiciones (leer un hecho) y acciones (escribir un resultado).
+
+type Dict = Record<string, unknown>;
 
 export function getPath(obj: unknown, path: string): unknown {
-  return path.split('.').reduce<unknown>((acc, key) => {
-    if (acc !== null && typeof acc === 'object' && key in (acc as Record<string, unknown>)) {
-      return (acc as Record<string, unknown>)[key];
-    }
-    return undefined;
-  }, obj);
+  let acc = obj;
+  for (const key of path.split('.')) {
+    if (acc === null || typeof acc !== 'object' || !(key in acc)) return undefined;
+    acc = (acc as Dict)[key];
+  }
+  return acc;
 }
 
-export function setPath(obj: Record<string, unknown>, path: string, value: unknown): void {
+// Crea los objetos intermedios que falten.
+export function setPath(obj: Dict, path: string, value: unknown): void {
   const keys = path.split('.');
+  const last = keys.pop()!;
   let target = obj;
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    const next = target[key];
-    if (typeof next !== 'object' || next === null) {
-      target[key] = {};
-    }
-    target = target[key] as Record<string, unknown>;
+  for (const key of keys) {
+    if (typeof target[key] !== 'object' || target[key] === null) target[key] = {};
+    target = target[key] as Dict;
   }
-  target[keys[keys.length - 1]] = value;
+  target[last] = value;
 }

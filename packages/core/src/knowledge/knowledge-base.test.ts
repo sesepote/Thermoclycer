@@ -4,7 +4,7 @@ import { buildDemoKnowledgeBase } from './seed-data';
 
 test('guarda y recupera un primer por id', () => {
   const kb = buildDemoKnowledgeBase();
-  const primer = kb.getPrimer('primer-fwd-demo');
+  const primer = kb.primers.get('primer-fwd-demo');
   assert.ok(primer);
   assert.equal(primer?.nombre, 'Demo-FWD');
 });
@@ -33,7 +33,7 @@ test('reconstruye todos los componentes de un ensayo a partir de sus ids', () =>
 
 test('el protocolo demo respeta la estructura de 3 pasos por ciclo de la spec', () => {
   const kb = buildDemoKnowledgeBase();
-  const protocol = kb.getProtocol('protocol-demo-3step');
+  const protocol = kb.protocols.get('protocol-demo-3step');
   assert.ok(protocol);
   assert.equal(protocol?.cycles.count, 35);
   assert.equal(protocol?.cycles.steps.length, 3);
