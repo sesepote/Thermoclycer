@@ -39,7 +39,7 @@ function Sensor({ sensor }: { sensor: 'block' | 'lid' }) {
   const isBlock = sensor === 'block';
   const Icon = isBlock ? Thermometer : Flame;
   return (
-    <span className="sensor" title={isBlock ? 'Temperatura del bloque' : 'Temperatura de la tapa'}>
+    <span className={`sensor sensor--${sensor}`} title={isBlock ? 'Temperatura del bloque' : 'Temperatura de la tapa'}>
       <Icon size={14} aria-hidden="true" />
       <span className="sensor__label">{isBlock ? 'Bloque' : 'Tapa'}</span>
       <span className="sensor__value mono" style={{ color: isBlock ? temperatureColor(temperature, 66) : undefined }}>
