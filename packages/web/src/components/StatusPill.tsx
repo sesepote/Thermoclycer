@@ -1,6 +1,7 @@
 import { SimulationState } from '@thermocycler/core';
+import { useSimulation } from '../state/simulation';
 
-export const STATE_LABELS: Record<SimulationState, string> = {
+const STATE_LABELS: Record<SimulationState, string> = {
   IDLE: 'Sin programar',
   PROGRAMMED: 'Programado',
   RUNNING: 'En marcha',
@@ -10,7 +11,9 @@ export const STATE_LABELS: Record<SimulationState, string> = {
   ERROR: 'Error',
 };
 
-export function StatusPill({ state }: { state: SimulationState }) {
+// Solo se suscribe al estado (no al tiempo), así que no se re-renderiza en cada frame.
+export function StatusPill() {
+  const state = useSimulation(s => s.snapshot.state);
   return (
     <span className={`status-pill status-pill--${state.toLowerCase()}`} role="status">
       <span className="status-pill__dot" aria-hidden="true" />

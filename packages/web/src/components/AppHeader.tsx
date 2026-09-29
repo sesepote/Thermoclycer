@@ -1,24 +1,17 @@
-import { BookOpen, ClipboardCheck, Dna, Gauge } from 'lucide-react';
-import { SimulationSnapshot } from '@thermocycler/core';
+import { memo } from 'react';
 import { StatusPill } from './StatusPill';
 import { knowledgeBase } from '../lib/knowledge';
-
-export type AppTab = 'simulator' | 'primers' | 'evaluation' | 'knowledge';
-
-const TABS: { id: AppTab; label: string; icon: typeof Gauge }[] = [
-  { id: 'simulator', label: 'Simulador', icon: Gauge },
-  { id: 'primers', label: 'Primers', icon: Dna },
-  { id: 'evaluation', label: 'Evaluación', icon: ClipboardCheck },
-  { id: 'knowledge', label: 'Conocimiento', icon: BookOpen },
-];
+import { VIEWS, ViewId } from '../views';
 
 interface AppHeaderProps {
-  tab: AppTab;
-  onTabChange: (tab: AppTab) => void;
-  snapshot: SimulationSnapshot;
+  active: ViewId;
+  onNavigate: (view: ViewId) => void;
 }
 
-export function AppHeader({ tab, onTabChange, snapshot }: AppHeaderProps) {
+// Marca + navegación + estado del equipo. En pantallas estrechas la
+// navegación se convierte por CSS en una barra inferior fija, al
+// alcance del pulgar.
+export const AppHeader = memo(function AppHeader({ active, onNavigate }: AppHeaderProps) {
   return (
     <header className="header">
       <div className="header__brand">
@@ -34,21 +27,21 @@ export function AppHeader({ tab, onTabChange, snapshot }: AppHeaderProps) {
       </div>
 
       <nav className="tabs" aria-label="Secciones">
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {VIEWS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
-            className={`tabs__item ${tab === id ? 'tabs__item--active' : ''}`}
-            aria-current={tab === id ? 'page' : undefined}
-            onClick={() => onTabChange(id)}
+            className={`tabs__item ${active === id ? 'tabs__item--active' : ''}`}
+            aria-current={active === id ? 'page' : undefined}
+            onClick={() => onNavigate(id)}
           >
-            <Icon size={16} aria-hidden="true" />
-            {label}
+            <Icon size={18} aria-hidden="true" />
+            <span>{label}</span>
           </button>
         ))}
       </nav>
 
-      <StatusPill state={snapshot.state} />
+      <StatusPill />
     </header>
   );
-}
+});

@@ -1,7 +1,9 @@
-import { Pause, Play, Square, Flame } from 'lucide-react';
-import { Protocol, SimulationPhase, SimulationSnapshot, SimulationSpeed } from '@thermocycler/core';
+import { memo } from 'react';
+import { Flame, Pause, Play, RotateCcw, Square } from 'lucide-react';
+import { ProtocolStep, SimulationPhase, SimulationSpeed, SimulationState } from '@thermocycler/core';
 import { useRampedValue } from '../hooks/useRampedValue';
-import { formatClock, temperatureColor } from '../lib/format';
+import { cssVars, formatClock, temperatureColor } from '../lib/format';
+import { simulation, useSimulation } from '../state/simulation';
 import { ProgressRing } from './ProgressRing';
 import { WellPlate } from './WellPlate';
 import { STEP_TYPE_LABELS } from './StepRow';
@@ -18,46 +20,24 @@ const PHASE_LABELS: Record<SimulationPhase, string> = {
   completed: 'Finalizado',
 };
 
-interface DevicePanelProps {
-  snapshot: SimulationSnapshot;
-  protocol: Protocol | null;
-  speeds: readonly SimulationSpeed[];
-  currentSpeed: SimulationSpeed;
-  onPlay: () => void;
-  onPause: () => void;
-  onStop: () => void;
-  onSpeedChange: (speed: SimulationSpeed) => void;
-}
+/* ---------- Panel del instrumento (se re-renderiza en cada frame) ---------- */
 
-export function DevicePanel({
-  snapshot,
-  protocol,
-  speeds,
-  currentSpeed,
-  onPlay,
-  onPause,
-  onStop,
-  onSpeedChange,
-}: DevicePanelProps) {
-  const { state, phase } = snapshot;
+// Solo las lecturas del display cambian por frame; el resto de piezas
+// están memorizadas y se actualizan únicamente cuando cambian sus props.
+export function DevicePanel() {
+  const snapshot = useSimulation(s => s.snapshot);
+  const protocol = useSimulation(s => s.programmed);
+  const { state, phase, targetTemperature: setpoint } = snapshot;
+
   const isActive = state === 'RUNNING' || state === 'PAUSED';
-  const setpoint = snapshot.targetTemperature;
   const blockTemperature = useRampedValue(isActive || phase === 'hold' ? setpoint ?? AMBIENT_TEMPERATURE : AMBIENT_TEMPERATURE);
   const blockColor = temperatureColor(blockTemperature);
-  const lidOn = isActive;
-
-  const canPlay = state === 'PROGRAMMED' || state === 'PAUSED' || state === 'STOPPED' || state === 'COMPLETED';
-  const cycleSteps = protocol?.cycles.steps ?? [];
   const totalCycles = snapshot.totalCycles ?? protocol?.cycles.count ?? 0;
-  const completedCycles =
-    phase === 'cycle'
-      ? (snapshot.cycleNumber ?? 1) - 1
-      : phase === 'final_extension' || phase === 'hold' || phase === 'completed'
-        ? totalCycles
-        : 0;
+  const inCycle = phase === 'cycle';
+  const completedCycles = inCycle ? (snapshot.cycleNumber ?? 1) - 1 : ['final_extension', 'hold', 'completed'].includes(phase) ? totalCycles : 0;
 
   return (
-    <section className="card device" aria-labelledby="device-title" style={{ '--block-color': blockColor } as React.CSSProperties}>
+    <section className="card device" aria-labelledby="device-title" style={cssVars({ '--block-color': blockColor })}>
       <header className="card__head">
         <div>
           <p className="eyebrow">Instrumento</p>
@@ -65,16 +45,17 @@ export function DevicePanel({
             Termociclador TC-96
           </h2>
         </div>
-        <div className={`lid ${lidOn ? 'lid--on' : ''}`}>
+        <div className={`lid ${isActive ? 'lid--on' : ''}`}>
           <Flame size={14} aria-hidden="true" />
-          Tapa {lidOn ? `${LID_TEMPERATURE} °C` : 'apagada'}
+          Tapa {isActive ? `${LID_TEMPERATURE} °C` : 'apagada'}
         </div>
       </header>
 
+      {/* Display: temperatura del bloque, lecturas y placa */}
       <div className="device__display">
         <div className="lcd">
           <ProgressRing fraction={snapshot.progressFraction} color={blockColor}>
-            <span className="lcd__temp mono" aria-live="off">
+            <span className="lcd__temp mono">
               {blockTemperature.toFixed(1)}
               <small>°C</small>
             </span>
@@ -94,7 +75,7 @@ export function DevicePanel({
             </div>
             <div className="readout">
               <dt>Ciclo</dt>
-              <dd className="mono">{phase === 'cycle' ? `${snapshot.cycleNumber}/${totalCycles}` : `—/${totalCycles || '—'}`}</dd>
+              <dd className="mono">{`${inCycle ? snapshot.cycleNumber : '—'}/${totalCycles || '—'}`}</dd>
             </div>
             <div className="readout">
               <dt>Resta en fase</dt>
@@ -110,78 +91,94 @@ export function DevicePanel({
           </dl>
         </div>
 
-        <WellPlate color={blockColor} active={state === 'RUNNING'} />
+        <WellPlate active={state === 'RUNNING'} />
       </div>
 
-      {cycleSteps.length > 0 && (
-        <div className="device__steps" aria-label="Pasos del ciclo">
-          {cycleSteps.map((step, i) => {
-            const current = phase === 'cycle' && snapshot.stepIndex === i;
-            return (
-              <div
-                key={`${step.type}-${i}`}
-                className={`chip-step ${current ? 'chip-step--current' : ''}`}
-                style={{ '--chip-color': temperatureColor(step.temperature) } as React.CSSProperties}
-                aria-current={current ? 'step' : undefined}
-              >
-                <span className="chip-step__name">{step.label || STEP_TYPE_LABELS[step.type]}</span>
-                <span className="chip-step__meta mono">
-                  {step.temperature}°C · {step.durationSeconds}s
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {totalCycles > 0 && (
-        <div className="cycle-track" aria-label={`${completedCycles} de ${totalCycles} ciclos completados`}>
-          {Array.from({ length: totalCycles }, (_, i) => (
-            <span
-              key={i}
-              className={`cycle-track__dot ${i < completedCycles ? 'is-done' : ''} ${
-                phase === 'cycle' && i === completedCycles ? 'is-current' : ''
-              }`}
-            />
-          ))}
-        </div>
-      )}
+      <StepChips steps={protocol?.cycles.steps} current={inCycle ? snapshot.stepIndex : undefined} />
+      <CycleTrack total={totalCycles} completed={completedCycles} current={inCycle} />
 
       <footer className="device__controls">
-        <div className="transport">
-          {state === 'RUNNING' ? (
-            <button type="button" className="btn btn--warn btn--lg" onClick={onPause}>
-              <Pause size={18} aria-hidden="true" />
-              Pausar
-            </button>
-          ) : (
-            <button type="button" className="btn btn--primary btn--lg" onClick={onPlay} disabled={!canPlay}>
-              <Play size={18} aria-hidden="true" />
-              {state === 'PAUSED' ? 'Reanudar' : 'Iniciar'}
-            </button>
-          )}
-          <button type="button" className="btn btn--ghost btn--lg" onClick={onStop} disabled={!isActive && phase !== 'hold'}>
-            <Square size={16} aria-hidden="true" />
-            Detener
-          </button>
-        </div>
-
-        <div className="speed" role="radiogroup" aria-label="Velocidad de simulación">
-          <span className="speed__label">Velocidad</span>
-          {speeds.map(s => (
-            <button
-              key={s}
-              type="button"
-              role="radio"
-              aria-checked={s === currentSpeed}
-              className={`speed__opt ${s === currentSpeed ? 'is-active' : ''}`}
-              onClick={() => onSpeedChange(s)}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
+        <Transport state={state} canStop={isActive || phase === 'hold'} />
+        <SpeedSelector />
       </footer>
     </section>
+  );
+}
+
+/* ---------- Pasos del ciclo, resaltando el actual ---------- */
+
+const StepChips = memo(function StepChips({ steps, current }: { steps?: ProtocolStep[]; current?: number }) {
+  if (!steps?.length) return null;
+  return (
+    <div className="device__steps" aria-label="Pasos del ciclo">
+      {steps.map((step, i) => (
+        <div
+          key={i}
+          className={`chip-step ${current === i ? 'chip-step--current' : ''}`}
+          style={cssVars({ '--chip-color': temperatureColor(step.temperature) })}
+          aria-current={current === i ? 'step' : undefined}
+        >
+          <span className="chip-step__name">{step.label || STEP_TYPE_LABELS[step.type]}</span>
+          <span className="chip-step__meta mono">
+            {step.temperature}°C · {step.durationSeconds}s
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+/* ---------- Pista de ciclos: solo cambia al completar un ciclo ---------- */
+
+const CycleTrack = memo(function CycleTrack({ total, completed, current }: { total: number; completed: number; current: boolean }) {
+  if (total <= 0) return null;
+  return (
+    <div className="cycle-track" role="img" aria-label={`${completed} de ${total} ciclos completados`}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={`cycle-track__dot ${i < completed ? 'is-done' : ''} ${current && i === completed ? 'is-current' : ''}`} />
+      ))}
+    </div>
+  );
+});
+
+/* ---------- Controles de transporte ---------- */
+
+const Transport = memo(function Transport({ state, canStop }: { state: SimulationState; canStop: boolean }) {
+  const canPlay = ['PROGRAMMED', 'PAUSED', 'STOPPED', 'COMPLETED'].includes(state);
+  const replay = state === 'COMPLETED';
+  return (
+    <div className="transport">
+      {state === 'RUNNING' ? (
+        <button type="button" className="btn btn--warn btn--lg" onClick={simulation.pause}>
+          <Pause size={18} aria-hidden="true" />
+          Pausar
+        </button>
+      ) : (
+        <button type="button" className="btn btn--primary btn--lg" onClick={simulation.play} disabled={!canPlay}>
+          {replay ? <RotateCcw size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+          {state === 'PAUSED' ? 'Reanudar' : replay ? 'Repetir' : 'Iniciar'}
+        </button>
+      )}
+      <button type="button" className="btn btn--ghost btn--lg" onClick={simulation.stop} disabled={!canStop}>
+        <Square size={16} aria-hidden="true" />
+        Detener
+      </button>
+    </div>
+  );
+});
+
+/* ---------- Selector de velocidad (segmented control) ---------- */
+
+function SpeedSelector() {
+  const speed = useSimulation(s => s.speed);
+  return (
+    <div className="speed" role="radiogroup" aria-label="Velocidad de simulación">
+      <span className="speed__label">Velocidad</span>
+      {simulation.speeds.map((s: SimulationSpeed) => (
+        <button key={s} type="button" role="radio" aria-checked={s === speed} className={`speed__opt ${s === speed ? 'is-active' : ''}`} onClick={() => simulation.setSpeed(s)}>
+          {s}×
+        </button>
+      ))}
+    </div>
   );
 }

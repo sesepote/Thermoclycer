@@ -1,5 +1,6 @@
 import { Minus, Plus } from 'lucide-react';
 import { useId } from 'react';
+import { usePressRepeat } from '../hooks/usePressRepeat';
 
 interface NumberFieldProps {
   label: string;
@@ -12,15 +13,15 @@ interface NumberFieldProps {
   onChange: (value: number) => void;
 }
 
-export function NumberField({ label, value, unit, step = 1, min, max, disabled, onChange }: NumberFieldProps) {
+// Campo numérico con botones −/+ grandes para uso táctil: mantener
+// pulsado repite y acelera. El input sigue admitiendo teclear el valor.
+export function NumberField({ label, value, unit, step = 1, min = -Infinity, max = Infinity, disabled = false, onChange }: NumberFieldProps) {
   const id = useId();
+  const current = Number.isFinite(value) ? value : 0;
+  const nudge = (delta: number) => onChange(Math.round(Math.min(max, Math.max(min, current + delta)) * 100) / 100);
 
-  const clamp = (n: number) => {
-    let next = n;
-    if (min !== undefined) next = Math.max(min, next);
-    if (max !== undefined) next = Math.min(max, next);
-    return Math.round(next * 100) / 100;
-  };
+  const minus = usePressRepeat(() => nudge(-step), disabled || current <= min);
+  const plus = usePressRepeat(() => nudge(step), disabled || current >= max);
 
   return (
     <div className="nfield">
@@ -28,36 +29,26 @@ export function NumberField({ label, value, unit, step = 1, min, max, disabled, 
         {label}
       </label>
       <div className="nfield__control">
-        <button
-          type="button"
-          className="nfield__btn"
-          onClick={() => onChange(clamp(value - step))}
-          disabled={disabled}
-          aria-label={`Disminuir ${label}`}
-        >
-          <Minus size={14} aria-hidden="true" />
+        <button type="button" className="nfield__btn" disabled={disabled || current <= min} aria-label={`Disminuir ${label}`} {...minus}>
+          <Minus size={16} aria-hidden="true" />
         </button>
         <input
           id={id}
           type="number"
-          inputMode="decimal"
+          inputMode={Number.isInteger(step) && min >= 0 ? 'numeric' : 'decimal'}
+          enterKeyHint="done"
           className="nfield__input"
           value={Number.isFinite(value) ? value : ''}
           step={step}
-          min={min}
-          max={max}
+          min={Number.isFinite(min) ? min : undefined}
+          max={Number.isFinite(max) ? max : undefined}
           disabled={disabled}
+          onFocus={e => e.target.select()}
           onChange={e => onChange(e.target.value === '' ? NaN : Number(e.target.value))}
         />
         {unit && <span className="nfield__unit">{unit}</span>}
-        <button
-          type="button"
-          className="nfield__btn"
-          onClick={() => onChange(clamp(value + step))}
-          disabled={disabled}
-          aria-label={`Aumentar ${label}`}
-        >
-          <Plus size={14} aria-hidden="true" />
+        <button type="button" className="nfield__btn" disabled={disabled || current >= max} aria-label={`Aumentar ${label}`} {...plus}>
+          <Plus size={16} aria-hidden="true" />
         </button>
       </div>
     </div>

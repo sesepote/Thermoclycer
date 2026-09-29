@@ -1,9 +1,14 @@
+import { memo } from 'react';
+
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const COLUMNS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-export function WellPlate({ color, active }: { color: string; active: boolean }) {
+// Placa de 96 pocillos. El color sale de la variable CSS --block-color
+// que fija el panel, así que la temperatura cambiante no re-renderiza
+// estos 96 nodos: solo cambia cuando se enciende o apaga la animación.
+export const WellPlate = memo(function WellPlate({ active }: { active: boolean }) {
   return (
-    <figure className={`plate ${active ? 'plate--active' : ''}`} style={{ '--well-color': color } as React.CSSProperties}>
+    <figure className={`plate ${active ? 'plate--active' : ''}`}>
       <div className="plate__grid" aria-hidden="true">
         <span />
         {COLUMNS.map(c => (
@@ -23,4 +28,4 @@ export function WellPlate({ color, active }: { color: string; active: boolean })
       <figcaption className="plate__caption">Bloque de 96 pocillos</figcaption>
     </figure>
   );
-}
+});

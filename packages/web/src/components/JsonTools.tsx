@@ -9,6 +9,8 @@ interface JsonToolsProps {
   onImport: (state: EditorState) => void;
 }
 
+// Exporta el borrador a JSON (y al portapapeles) o importa uno pegado,
+// validando su forma con el parser del core.
 export function JsonTools({ protocol, disabled, onImport }: JsonToolsProps) {
   const [text, setText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -23,7 +25,7 @@ export function JsonTools({ protocol, disabled, onImport }: JsonToolsProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      setCopied(false);
+      // Sin permiso de portapapeles: el JSON queda igualmente en el área de texto.
     }
   };
 
@@ -32,14 +34,10 @@ export function JsonTools({ protocol, disabled, onImport }: JsonToolsProps) {
     try {
       raw = JSON.parse(text);
     } catch {
-      setErrors(['El texto no es JSON válido.']);
-      return;
+      return setErrors(['El texto no es JSON válido.']);
     }
     const result = parseProtocolJson(raw, 'importado');
-    if (!result.ok) {
-      setErrors(result.errors.map(e => `${e.path}: ${e.message}`));
-      return;
-    }
+    if (!result.ok) return setErrors(result.errors.map(e => `${e.path}: ${e.message}`));
     setErrors([]);
     onImport(protocolToEditorState(result.protocol));
   };
@@ -50,12 +48,9 @@ export function JsonTools({ protocol, disabled, onImport }: JsonToolsProps) {
         <Braces size={16} aria-hidden="true" />
         Importar / exportar JSON
       </summary>
-      <label className="sr-only" htmlFor="json-input">
-        Protocolo en JSON
-      </label>
       <textarea
-        id="json-input"
         className="json-tools__input mono"
+        aria-label="Protocolo en JSON"
         rows={8}
         spellCheck={false}
         placeholder='{"cycles": {"count": 35, "steps": [...]}}'
