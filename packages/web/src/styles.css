@@ -1738,6 +1738,11 @@ button {
 .readout--total {
   --readout-color: #6ee7b7;
 }
+@container (max-width: 520px) {
+  .readout--total {
+    grid-column: 1 / -1;
+  }
+}
 .readout__label {
   font: 700 11px var(--font-mono);
   text-transform: uppercase;
@@ -1875,6 +1880,8 @@ button {
   grid-column: 1 / -1;
   width: 100%;
   height: 100%;
+  /* Sin tamaño intrínseco: el viewBox estrecho no debe estirar la fila */
+  contain: size;
   border-radius: 10px;
   background: repeating-linear-gradient(0deg, transparent 0 47px, rgb(255 255 255 / 0.04) 47px 48px), #081321;
   pointer-events: none;

@@ -102,14 +102,16 @@ export class SimulationStore {
 
   // El bucle solo existe mientras la simulación corre o alguna
   // temperatura aún no ha alcanzado su consigna.
+  // lastFrameTime solo se reinicia al parar el bucle: así el primer frame
+  // tras un arranque no cuenta el tiempo que estuvo parado.
   private syncClock() {
     const needed = this.state.snapshot.state === 'RUNNING' || !this.settled();
     if (needed && !this.frame) {
-      this.lastFrameTime = null;
       this.frame = requestAnimationFrame(this.onFrame);
-    } else if (!needed && this.frame) {
-      cancelAnimationFrame(this.frame);
+    } else if (!needed) {
+      if (this.frame) cancelAnimationFrame(this.frame);
       this.frame = 0;
+      this.lastFrameTime = null;
     }
   }
 
