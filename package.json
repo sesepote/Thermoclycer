@@ -14,5 +14,8 @@
     "demo:core": "npm run demo -w @thermocycler/core",
     "dev:web": "npm run dev -w @thermocycler/web",
     "build:web": "npm run build -w @thermocycler/web"
+  },
+  "engines": {
+    "node": ">=21"
   }
 }
