@@ -42,7 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadProtocol = useCallback(
     (protocol: Protocol) => {
       setEditor(protocolToEditorState(protocol));
-      goTo('simulator');
+      goTo('program');
     },
     [goTo],
   );
@@ -50,7 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const applyAnnealing = useCallback(
     (temperature: number) => {
       setEditor(prev => ({ ...prev, steps: prev.steps.map(s => (s.type === 'annealing' ? { ...s, temperature } : s)) }));
-      goTo('simulator');
+      goTo('program');
     },
     [goTo],
   );

@@ -1,5 +1,5 @@
 import { ReactNode, memo, useMemo } from 'react';
-import { CircleAlert, CircleCheck, Plus, Repeat, Save } from 'lucide-react';
+import { CircleAlert, CircleCheck, Play, Plus, Repeat, Save } from 'lucide-react';
 import { calculateTotalRuntime, cycleDuration, validateProtocol } from '@thermocycler/core';
 import { EditorPhase, EditorState, EditorStep, PROTOCOL_PRESETS, PhaseKey, buildProtocol, newStepId } from '../lib/editorState';
 import { cssVars, formatDuration, temperatureColor } from '../lib/format';
@@ -118,6 +118,11 @@ export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, on
         </div>
       </header>
 
+      <label className="editor__name">
+        <span className="field-label">Nombre del programa</span>
+        <input className="text-input" value={state.name} maxLength={40} disabled={locked} onChange={e => set('name', e.target.value)} />
+      </label>
+
       {/* Plantillas */}
       <div className="presets" role="group" aria-label="Plantillas de protocolo">
         {PROTOCOL_PRESETS.map(preset => (
@@ -186,9 +191,10 @@ export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, on
           </ul>
         )}
 
-        <button type="button" className="btn btn--primary btn--lg" onClick={onSave} disabled={locked || !validation.valid}>
-          <Save size={16} aria-hidden="true" />
-          {isDirty ? 'Cargar en el termociclador' : 'Programa cargado'}
+        {/* Sin cambios pendientes, el botón lleva directamente al panel de ejecución */}
+        <button type="button" className="btn btn--primary btn--lg" onClick={onSave} disabled={isDirty && (locked || !validation.valid)}>
+          {isDirty ? <Save size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+          {isDirty ? 'Cargar en el equipo' : 'Abrir panel de ejecución'}
         </button>
       </footer>
     </section>

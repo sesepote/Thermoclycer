@@ -1,17 +1,18 @@
 import { ComponentType, lazy } from 'react';
-import { BookOpen, ClipboardCheck, Dna, Gauge, LucideIcon } from 'lucide-react';
-import SimulatorView from './SimulatorView';
+import { BookOpen, ClipboardCheck, Dna, FilePlus2, Home, LucideIcon, Play } from 'lucide-react';
+import HomeView from './HomeView';
 
-// Registro de vistas de la aplicación. Añadir una sección nueva es
-// añadir una entrada aquí: la navegación (pestañas, barra inferior,
-// gestos de deslizar y rutas #/id) se genera a partir de esta lista.
+// Registro de pantallas del equipo. Añadir una opción es añadir una
+// entrada: aparece sola como icono en la pantalla de inicio, tiene su
+// ruta #/id y su título en la barra de estado.
 //
-// La vista principal se carga de inicio; el resto va en chunks aparte
-// (code splitting) que se precargan en segundo plano tras el arranque.
+// Inicio se carga de entrada; el resto va en chunks aparte (code
+// splitting) que se precargan en segundo plano tras el arranque.
 
 interface ViewDef {
   id: string;
   label: string;
+  description: string;
   icon: LucideIcon;
   component: ComponentType;
   preload?: () => Promise<unknown>;
@@ -20,15 +21,17 @@ interface ViewDef {
 const lazyView = (load: () => Promise<{ default: ComponentType }>) => ({ component: lazy(load), preload: load });
 
 export const VIEWS = [
-  { id: 'simulator', label: 'Simulador', icon: Gauge, component: SimulatorView },
-  { id: 'primers', label: 'Primers', icon: Dna, ...lazyView(() => import('./PrimerLab')) },
-  { id: 'evaluation', label: 'Evaluación', icon: ClipboardCheck, ...lazyView(() => import('./EvaluationView')) },
-  { id: 'knowledge', label: 'Conocimiento', icon: BookOpen, ...lazyView(() => import('./KnowledgeView')) },
+  { id: 'home', label: 'Inicio', description: 'Pantalla principal', icon: Home, component: HomeView },
+  { id: 'program', label: 'Programa', description: 'Editar protocolo y plantillas', icon: FilePlus2, ...lazyView(() => import('./ProgramView')) },
+  { id: 'run', label: 'Ejecutar', description: 'Panel del termociclador', icon: Play, ...lazyView(() => import('./RunView')) },
+  { id: 'primers', label: 'Primers', description: 'Tm, GC e hibridación', icon: Dna, ...lazyView(() => import('./PrimerLab')) },
+  { id: 'evaluation', label: 'Evaluación', description: 'Comparar con la referencia', icon: ClipboardCheck, ...lazyView(() => import('./EvaluationView')) },
+  { id: 'knowledge', label: 'Sistema', description: 'Base de conocimiento y reglas', icon: BookOpen, ...lazyView(() => import('./KnowledgeView')) },
 ] as const satisfies readonly ViewDef[];
 
 export type ViewId = (typeof VIEWS)[number]['id'];
 
-// Índice de la vista en la lista; un id desconocido cae en la primera.
-export const viewIndex = (id: string) => Math.max(0, VIEWS.findIndex(v => v.id === id));
+// Pantalla por id; un id desconocido lleva a Inicio.
+export const findView = (id: string) => VIEWS.find(v => v.id === id) ?? VIEWS[0];
 
 export const preloadViews = () => VIEWS.forEach(v => 'preload' in v && v.preload());

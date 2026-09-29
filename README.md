@@ -29,19 +29,24 @@ npm run build        # build de producción de la interfaz (packages/web/dist)
 
 ```
 src/
-  App.tsx              armazón: cabecera, vista activa, gesto de deslizar
-  views/index.ts       registro de vistas (pestañas, rutas #/id, carga diferida)
-  views/*.tsx          una vista por sección
-  state/simulation.ts  store externo de la simulación con su propio bucle rAF
+  App.tsx              carcasa del equipo + pantalla (barra de estado y vista activa)
+  views/index.ts       registro de pantallas (iconos de inicio, rutas #/id, carga diferida)
+  views/HomeView.tsx   pantalla de inicio: telemetría, accesos en órbita, plantillas
+  views/ProgramView    editor de protocolo + vista previa del perfil
+  views/RunView        panel de ejecución: lecturas, etapas, perfil, placa, transporte
+  views/*.tsx          resto de pantallas (primers, evaluación, sistema)
+  state/simulation.ts  store externo: simulación, bucle rAF y rampas de bloque y tapa
   state/app.tsx        contexto: vista activa y borrador del editor
-  components/          piezas reutilizables (editor, panel del equipo, perfil…)
-  hooks/               useRampedValue, usePressRepeat, useSwipe
+  components/device/   carcasa (LEDs, marco, frontal) y barra de estado
+  components/run/      diagrama de etapas del panel de ejecución
+  components/          piezas reutilizables (editor, perfil térmico, placa…)
+  hooks/               usePressRepeat, useClock
   lib/                 conversión editor ⇄ protocolo, formato, base de conocimiento
 ```
 
 ### Cómo escalar
 
-- **Nueva sección**: añadir una entrada en `views/index.ts`. La pestaña, la barra inferior, el gesto de deslizar y la ruta se generan solos, y la vista se carga en un chunk aparte.
+- **Nueva sección**: añadir una entrada en `views/index.ts`. Su icono en la pantalla de inicio (esfera en órbita o acceso en el dock), su título en la barra de estado y su ruta se generan solos, y la pantalla se carga en un chunk aparte.
 - **Nueva plantilla de protocolo**: una entrada en `PROTOCOL_PRESETS` (`lib/editorState.ts`).
 - **Nueva fase opcional del editor**: una entrada en `BEFORE_CYCLES`/`AFTER_CYCLES` (`components/ProtocolEditor.tsx`).
 - **Nuevo tipo de entidad en la base de conocimiento**: un campo `Collection<T>` más en `KnowledgeBase`.
@@ -49,13 +54,15 @@ src/
 
 ### Rendimiento
 
-La simulación vive fuera de React (`state/simulation.ts`) y los componentes se suscriben con selectores, así que cada frame solo re-renderiza las lecturas del display y el marcador del perfil térmico. El resto (editor, placa de 96 pocillos, pista de ciclos…) está memorizado.
+La simulación vive fuera de React (`state/simulation.ts`) y los componentes se suscriben con selectores, así que cada frame solo re-renderiza las lecturas grandes del panel, la barra del paso actual y el marcador del perfil térmico. Las temperaturas de la barra de estado se redondean a 0,1 °C en el selector, así que solo cambian cuando cambia el dígito. El resto (editor, placa de 96 pocillos, diagrama de etapas…) está memorizado.
 
 ### Pantalla táctil
 
 - Objetivos de toque de 44–48 px en dispositivos táctiles (`@media (pointer: coarse)`); el `:hover` solo se aplica con ratón.
 - Botones −/+ que repiten y aceleran al mantenerlos pulsados.
-- En móvil la navegación pasa a una barra inferior; se puede deslizar a izquierda o derecha para cambiar de sección, y el botón "atrás" navega entre secciones.
+- La interfaz imita un termociclador de sobremesa: carcasa gris con LEDs, pantalla táctil con marco azul y frontal con USB. En móvil la carcasa desaparece y la pantalla del equipo ocupa todo el viewport.
+- Navegación como en el equipo: pantalla de inicio con iconos grandes y botón de inicio siempre visible en la barra de estado; el botón "atrás" del sistema también navega.
+- Los controles de ejecución quedan fijos al pie de la pantalla y detener pide confirmación.
 - El perfil térmico se inspecciona arrastrando el dedo (o pasando el ratón).
 - La tabla de evaluación se muestra como tarjetas en pantallas estrechas; se respetan las safe areas (notch) y la app es instalable (manifiesto web).
 
@@ -67,7 +74,7 @@ La simulación vive fuera de React (`state/simulation.ts`) y los componentes se 
 - **Fase 4** — motor de cálculo (`core/src/calculations`)
 - **Fase 5** — validador de protocolos (`core/src/protocols`)
 - **Fase 8** (parcial, lo justo para la UI) — simulación (`core/src/simulation`): máquina de estados + cálculo de temporización; el reloj lo lleva la web con `requestAnimationFrame`
-- **Fase 9** — interfaz gráfica (`packages/web`): editor de protocolo, panel del dispositivo, laboratorio de primers, evaluación y base de conocimiento
+- **Fase 9** — interfaz gráfica (`packages/web`): pantalla de inicio, editor de protocolo, panel de ejecución, laboratorio de primers, evaluación y base de conocimiento
 
 ## Qué falta
 

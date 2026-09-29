@@ -1,15 +1,5 @@
-import { SimulationState } from '@thermocycler/core';
+import { STATE_LABELS } from '../lib/labels';
 import { useSimulation } from '../state/simulation';
-
-const STATE_LABELS: Record<SimulationState, string> = {
-  IDLE: 'Sin programar',
-  PROGRAMMED: 'Programado',
-  RUNNING: 'En marcha',
-  PAUSED: 'En pausa',
-  COMPLETED: 'Completado',
-  STOPPED: 'Detenido',
-  ERROR: 'Error',
-};
 
 // Solo se suscribe al estado (no al tiempo), así que no se re-renderiza en cada frame.
 export function StatusPill() {

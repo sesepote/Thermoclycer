@@ -2,14 +2,8 @@ import { ChevronDown, ChevronUp, Copy, LucideIcon, Trash2 } from 'lucide-react';
 import { StepType } from '@thermocycler/core';
 import { EditorStep } from '../lib/editorState';
 import { cssVars, temperatureColor } from '../lib/format';
+import { STEP_TYPE_LABELS } from '../lib/labels';
 import { NumberField } from './NumberField';
-
-export const STEP_TYPE_LABELS: Record<StepType, string> = {
-  denaturation: 'Desnaturalización',
-  annealing: 'Hibridación',
-  extension: 'Extensión',
-  custom: 'Personalizado',
-};
 
 interface StepRowProps {
   step: EditorStep;

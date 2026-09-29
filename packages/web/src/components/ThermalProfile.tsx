@@ -1,8 +1,8 @@
 import { PointerEvent, memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Protocol } from '@thermocycler/core';
 import { formatClock, formatDuration, temperatureColor } from '../lib/format';
+import { STEP_TYPE_LABELS } from '../lib/labels';
 import { useSimulation } from '../state/simulation';
-import { STEP_TYPE_LABELS } from './StepRow';
 
 // Coordenadas en unidades del viewBox (el SVG se estira al ancho disponible).
 const WIDTH = 1000;
