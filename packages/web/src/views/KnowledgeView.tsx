@@ -55,7 +55,7 @@ function EntityCard({ icon: Icon, kind, name, rows, tags }: EntityCardProps) {
 /* ---------- Vista: entidades del ensayo + motores de reglas y cálculo ---------- */
 
 export default function KnowledgeView() {
-  const { annealingTemperature = FALLBACK_ANNEALING } = useApp();
+  const annealingTemperature = useApp(s => s.annealingTemperature) ?? FALLBACK_ANNEALING;
   const poly = c?.polymerase;
   const buffer = c?.buffer;
   const compatible = poly && buffer ? knowledgeBase.isPolymeraseBufferCompatible(poly.id, buffer.id) : false;

@@ -29,7 +29,7 @@ npm run build        # build de producción de la interfaz (packages/web/dist)
 
 ```
 src/
-  App.tsx              carcasa del equipo + pantalla (barra de estado y vista activa)
+  App.tsx              pantalla completa del equipo (barra de estado y vista activa)
   views/index.ts       registro de pantallas (iconos de inicio, rutas #/id, carga diferida)
   views/HomeView.tsx   pantalla de inicio: telemetría, accesos en órbita, plantillas
   views/ProgramView    editor de protocolo + vista previa del perfil
@@ -37,11 +37,12 @@ src/
   views/*.tsx          resto de pantallas (primers, evaluación, sistema)
   cycler/              termociclador de Termociclador-solo sin su carcasa: editor táctil
                        del perfil, gradiente, bucles, biblioteca, monitor de corrida y
-                       placa de 96 pocillos (Tailwind v4, acotado a esta carpeta)
-  state/instrument.ts  store externo: lecturas que el termociclador publica para la
-                       barra de estado, los LEDs y el inicio; carga de programas
-  state/app.tsx        contexto: vista activa y borrador del editor
-  components/device/   carcasa (LEDs, marco, frontal) y barra de estado
+                       placa de 96 pocillos (Tailwind v4, acotado a esta carpeta);
+                       cycler/store.ts guarda programa y biblioteca (zustand persist)
+  state/instrument.ts  store (zustand): lecturas que el termociclador publica para la
+                       barra de estado y el inicio
+  state/app.ts         store (zustand): vista activa y borrador del editor
+  components/device/   barra de estado
   components/          piezas reutilizables (editor, perfil térmico…)
   hooks/               usePressRepeat, useClock
   lib/                 conversión editor ⇄ protocolo ⇄ termociclador, formato, base de conocimiento
@@ -57,13 +58,14 @@ src/
 
 ### Rendimiento
 
-El termociclador publica sus lecturas en `state/instrument.ts` (solo notifica si algo cambió) y el resto de la interfaz se suscribe con selectores, así que la barra de estado, los LEDs y el inicio solo se re-renderizan cuando cambia el valor que muestran. El termociclador y sus estilos Tailwind viajan en un chunk diferido; la pantalla sigue montada (oculta) al navegar, para que una corrida no se pare.
+El termociclador publica sus lecturas en `state/instrument.ts` y el resto de la interfaz se suscribe con selectores, así que la barra de estado y el inicio solo se re-renderizan cuando cambia el valor que muestran. El termociclador y sus estilos Tailwind viajan en un chunk diferido; la pantalla sigue montada (oculta) al navegar, para que una corrida no se pare.
 
 ### Pantalla táctil
 
 - Objetivos de toque de 44–48 px en dispositivos táctiles (`@media (pointer: coarse)`); el `:hover` solo se aplica con ratón.
 - Botones −/+ que repiten y aceleran al mantenerlos pulsados.
-- La interfaz imita un termociclador de sobremesa: carcasa gris con LEDs, pantalla táctil con marco azul y frontal con USB. En móvil la carcasa desaparece y la pantalla del equipo ocupa todo el viewport.
+- La pantalla del equipo ocupa todo el viewport, sin carcasa ni marco.
+- En el termociclador, la temperatura y el tiempo de cada paso se editan tocando sus etiquetas en el gráfico (área de toque ampliada, también con teclado). Los modales usan Radix Dialog: foco atrapado, Esc para cerrar y bloqueo del scroll.
 - Navegación como en el equipo: pantalla de inicio con iconos grandes y botón de inicio siempre visible en la barra de estado; el botón "atrás" del sistema también navega.
 - El termociclador tiene teclado numérico táctil, bucles de ciclos, gradiente por columnas, biblioteca de protocolos, pitidos de equipo y monitor de corrida con placa de 96 pocillos; abortar pide confirmación. "Cargar en el termociclador" en Programa le envía el protocolo del editor.
 - El perfil térmico se inspecciona arrastrando el dedo (o pasando el ratón).

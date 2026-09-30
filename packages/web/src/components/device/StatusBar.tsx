@@ -10,7 +10,7 @@ import { StatusPill } from '../StatusPill';
 // Barra superior de la pantalla del equipo: botón de inicio, pantalla
 // actual, lecturas de bloque y tapa, estado y reloj.
 export const StatusBar = memo(function StatusBar({ viewId }: { viewId: string }) {
-  const { goTo } = useApp();
+  const goTo = useApp(s => s.goTo);
   const { id, label, icon: Icon } = findView(viewId);
   const isHome = id === 'home';
 

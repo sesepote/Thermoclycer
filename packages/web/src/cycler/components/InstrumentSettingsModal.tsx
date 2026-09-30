@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Settings, Flame, Volume2, Check } from 'lucide-react';
 import { PCRProtocol } from '../types/pcr';
 import { isSoundEnabled, setSoundEnabled, playKeyClick, playConfirmBeep } from '../utils/audio';
@@ -35,7 +36,7 @@ export const InstrumentSettingsModal: React.FC<InstrumentSettingsModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+    <Modal title="Configuración del equipo" onClose={onClose} padding="p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/90 border-b border-slate-700">
@@ -191,6 +192,6 @@ export const InstrumentSettingsModal: React.FC<InstrumentSettingsModalProps> = (
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

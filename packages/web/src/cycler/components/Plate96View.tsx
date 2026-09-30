@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Grid, Info } from 'lucide-react';
 import { PCRProtocol, PCRStep } from '../types/pcr';
 import { calculateGradientColumns, getThermalColor } from '../utils/gradient';
@@ -129,7 +130,7 @@ export const Plate96View: React.FC<Plate96ViewProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 select-none">
+    <Modal title="Placa de 96 pocillos" onClose={() => onClose?.()} padding="p-3">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/90 border-b border-slate-700">
@@ -173,6 +174,6 @@ export const Plate96View: React.FC<Plate96ViewProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };

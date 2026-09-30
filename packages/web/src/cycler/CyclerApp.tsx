@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { PCRProtocol, PCRStep, PCRCycleLoop, ModalType, GradientConfig } from './types/pcr';
-import { DEFAULT_T5000_PROTOCOL } from './utils/presets';
 import { usePCRRunner } from './hooks/usePCRRunner';
 import { TopStatusBar } from './components/TopStatusBar';
 import { ThermalProfileGraph } from './components/ThermalProfileGraph';
@@ -13,38 +12,20 @@ import { InstrumentSettingsModal } from './components/InstrumentSettingsModal';
 import { Plate96View } from './components/Plate96View';
 import { RunMonitorScreen } from './components/RunMonitorScreen';
 import { playConfirmBeep, playKeyClick } from './utils/audio';
-import { instrument, useInstrument } from '../state/instrument';
-
-const STORAGE_KEY_CURRENT = 't5000_current_protocol';
-const STORAGE_KEY_USER_PROTOCOLS = 't5000_user_protocols';
+import { publishReadings } from '../state/instrument';
+import { useCyclerStore } from './store';
 
 // Pantalla del termociclador (proyecto Termociclador-solo) sin su
 // carcasa. Publica su estado en state/instrument para la barra de estado
-// y el inicio, y acepta programas enviados desde el editor de protocolo.
+// y el inicio. El programa y la biblioteca viven en ./store (persistidos),
+// donde también escribe el editor de protocolo para cargar un programa.
 // La temperatura y el tiempo de un paso se editan tocando sus etiquetas
 // en el gráfico.
 export default function CyclerApp() {
-  // Protocol State
-  const [protocol, setProtocol] = useState<PCRProtocol>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CURRENT);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return DEFAULT_T5000_PROTOCOL;
-  });
-
-  // User Saved Protocols
-  const [userProtocols, setUserProtocols] = useState<PCRProtocol[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_USER_PROTOCOLS);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  const protocol = useCyclerStore(s => s.protocol);
+  const setProtocol = useCyclerStore(s => s.setProtocol);
+  const userProtocols = useCyclerStore(s => s.userProtocols);
+  const setUserProtocols = useCyclerStore(s => s.setUserProtocols);
 
   // UI Selection & Modal State
   const [selectedStepIndex, setSelectedStepIndex] = useState<number>(1);
@@ -62,24 +43,6 @@ export default function CyclerApp() {
   } = usePCRRunner({
     protocol,
   });
-
-  // Save current protocol to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(protocol));
-    } catch {
-      // ignore
-    }
-  }, [protocol]);
-
-  // Save user protocols
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_USER_PROTOCOLS, JSON.stringify(userProtocols));
-    } catch {
-      // ignore
-    }
-  }, [userProtocols]);
 
   // Step Operations
   const handleSelectStep = (index: number) => {
@@ -235,23 +198,20 @@ export default function CyclerApp() {
   const isRunning = progressState.state !== 'idle';
   const currentStep = protocol.steps[selectedStepIndex] || protocol.steps[0];
 
-  // Programa enviado desde el editor: se carga si el equipo no está en marcha.
-  const loadRequest = useInstrument(s => s.loadRequest);
+  // Programa nuevo (biblioteca o editor): selección dentro de rango y, si
+  // quedaba una corrida completada en pantalla, vuelta al editor. Solo
+  // depende del id del programa, no de cada edición.
   useEffect(() => {
-    if (!loadRequest || (isRunning && progressState.state !== 'completed')) return;
-    const next = instrument.takeLoadRequest();
-    if (!next) return;
+    setSelectedStepIndex(i => Math.min(i, protocol.steps.length - 1));
     if (progressState.state === 'completed') stopRun();
-    setProtocol(next);
-    setSelectedStepIndex(0);
-  }, [loadRequest, isRunning, progressState.state, stopRun]);
+  }, [protocol.id]);
 
   // Lecturas para el resto de la interfaz.
   useEffect(() => {
     const p = progressState;
     const done = p.state === 'completed';
     const total = p.totalElapsedSeconds + p.estimatedRemainingSeconds;
-    instrument.publish({
+    publishReadings({
       run: p.state,
       blockTemperature: p.currentBlockTemp,
       lidTemperature: p.currentLidTemp,

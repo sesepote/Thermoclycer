@@ -1,15 +1,13 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { StatusBar } from './components/device/StatusBar';
-import { AppProvider, useApp } from './state/app';
+import { useApp } from './state/app';
 import { KEEP_ALIVE_VIEWS, findView, preloadViews } from './views';
 
 export default function App() {
   return (
-    <AppProvider>
-      <div className="screen">
-        <Screen />
-      </div>
-    </AppProvider>
+    <div className="screen">
+      <Screen />
+    </div>
   );
 }
 
@@ -18,7 +16,7 @@ const loading = <p className="loading">Cargando…</p>;
 // Pantalla táctil del equipo a pantalla completa: barra de estado fija +
 // pantalla activa, que hace scroll por dentro (no la página entera).
 function Screen() {
-  const { view } = useApp();
+  const view = useApp(s => s.view);
   const current = findView(view);
   const { id } = current;
   const View = current.component;

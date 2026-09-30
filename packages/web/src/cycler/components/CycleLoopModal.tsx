@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Repeat, Check, Plus, Minus } from 'lucide-react';
 import { PCRStep, PCRCycleLoop } from '../types/pcr';
 import { playKeyClick, playConfirmBeep } from '../utils/audio';
@@ -39,7 +40,7 @@ export const CycleLoopModal: React.FC<CycleLoopModalProps> = ({
   const cyclePresets = [25, 30, 32, 35, 40];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+    <Modal title="Configurar ciclos" onClose={onClose} padding="p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/90 border-b border-slate-700">
@@ -188,6 +189,6 @@ export const CycleLoopModal: React.FC<CycleLoopModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

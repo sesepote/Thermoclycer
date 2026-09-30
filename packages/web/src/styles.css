@@ -1327,13 +1327,11 @@ button {
 
 /* ---------- Termociclador (Termociclador-solo, estilos en cycler/cycler.css) ---------- */
 
-/* Ocupa toda la pantalla, sin margen interior. Sin container-type, sus
-   modales (position: fixed) se anclan a la pantalla y no al área con scroll. */
+/* Ocupa toda la pantalla, sin margen interior (sus modales van en un portal) */
 .screen__body--run {
   padding: 0;
   display: flex;
   flex-direction: column;
-  container-type: normal;
 }
 .keep-alive {
   flex: 1;

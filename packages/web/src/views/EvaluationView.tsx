@@ -23,7 +23,8 @@ const show = (value?: number) => (value === undefined ? '—' : String(value));
 // Compara el borrador del editor con el protocolo de referencia del
 // ensayo, parámetro a parámetro, y resume cuántos pasan.
 export default function EvaluationView() {
-  const { draft, loadProtocol } = useApp();
+  const draft = useApp(s => s.draft);
+  const loadProtocol = useApp(s => s.loadProtocol);
   const reference = demoAssay?.referenceProtocol;
 
   const { comparisons, counts, passing, scored } = useMemo(() => {

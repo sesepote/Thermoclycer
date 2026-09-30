@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Delete, Check, RotateCcw } from 'lucide-react';
 import { playKeyClick, playConfirmBeep } from '../utils/audio';
 import { formatDuration } from '../utils/gradient';
@@ -173,7 +174,7 @@ export const TouchNumpadModal: React.FC<TouchNumpadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+    <Modal title={isTimeMode ? 'Editar tiempo' : 'Editar temperatura'} onClose={onClose} padding="p-4">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/80 border-b border-slate-700">
@@ -348,6 +349,6 @@ export const TouchNumpadModal: React.FC<TouchNumpadModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };

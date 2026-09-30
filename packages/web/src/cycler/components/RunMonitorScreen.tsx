@@ -16,6 +16,7 @@ import { PCRProtocol, RunProgressState } from '../types/pcr';
 import { formatDuration } from '../utils/gradient';
 import { ThermalProfileGraph } from './ThermalProfileGraph';
 import { Plate96View } from './Plate96View';
+import { Modal } from './Modal';
 import { playKeyClick, playConfirmBeep } from '../utils/audio';
 
 interface RunMonitorScreenProps {
@@ -376,7 +377,7 @@ export const RunMonitorScreen: React.FC<RunMonitorScreenProps> = ({
 
       {/* Stop Confirmation Dialog */}
       {showConfirmStop && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+        <Modal title="Detener corrida" onClose={() => setShowConfirmStop(false)}>
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <h4 className="font-bold text-white text-base">¿Detener Corrida de PCR?</h4>
             <p className="text-xs text-slate-300">
@@ -400,7 +401,7 @@ export const RunMonitorScreen: React.FC<RunMonitorScreenProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -108,7 +108,8 @@ function PrimerCard({ title, direction, sequence, onChange }: PrimerCardProps) {
 /* ---------- Vista: dos primers + rango de hibridación ---------- */
 
 export default function PrimerLab() {
-  const { annealingTemperature, applyAnnealing } = useApp();
+  const annealingTemperature = useApp(s => s.annealingTemperature);
+  const applyAnnealing = useApp(s => s.applyAnnealing);
   const [forward, setForward] = useState(demoAssay?.primerForward?.secuencia ?? '');
   const [reverse, setReverse] = useState(demoAssay?.primerReverse?.secuencia ?? '');
 

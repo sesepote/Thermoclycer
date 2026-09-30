@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Flame, Check, HelpCircle } from 'lucide-react';
 import { GradientConfig } from '../types/pcr';
 import { calculateGradientColumns, getThermalColor } from '../utils/gradient';
@@ -68,7 +69,7 @@ export const GradientModal: React.FC<GradientModalProps> = ({
   const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 select-none">
+    <Modal title="Gradiente térmico" onClose={onClose} padding="p-3">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/90 border-b border-slate-700">
@@ -346,6 +347,6 @@ export const GradientModal: React.FC<GradientModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

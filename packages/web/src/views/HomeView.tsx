@@ -18,7 +18,7 @@ const ORBIT_SLOTS = 4;
 // accesos en el centro (Ejecutar en medio) y plantillas + sistema abajo.
 // Se genera desde el registro de vistas: una vista nueva aparece sola.
 export default function HomeView() {
-  const { goTo } = useApp();
+  const goTo = useApp(s => s.goTo);
   // VIEWS se lee al renderizar (no a nivel de módulo) porque el registro
   // importa esta vista de forma síncrona.
   const shortcuts = VIEWS.filter(v => v.id !== 'home' && v.id !== 'run');
@@ -137,7 +137,8 @@ const RunSphere = memo(function RunSphere({ onOpen }: { onOpen: () => void }) {
 /* ---------- Dock: plantillas y base de conocimiento ---------- */
 
 function Templates() {
-  const { setEditor, goTo } = useApp();
+  const setEditor = useApp(s => s.setEditor);
+  const goTo = useApp(s => s.goTo);
   const locked = useInstrument(s => isActiveRun(s.run));
   return (
     <section className="dock-card" aria-labelledby="templates-title">
