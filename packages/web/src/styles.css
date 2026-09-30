@@ -11,12 +11,6 @@
   --accent: #22d3ee;
   --accent-ink: #032530;
   --brand: #1f6fe0;
-  /* Carcasa: gris claro con marco y base azules, como el equipo real */
-  --shell-hi: #f3f5f8;
-  --shell: #dfe4ea;
-  --shell-lo: #c3cbd5;
-  --shell-ink: #46546a;
-  --bezel: #1b5fcf;
   --ok: #34d399;
   --warn: #fbbf24;
   --error: #f87171;
@@ -45,7 +39,7 @@
 html,
 body {
   margin: 0;
-  background: radial-gradient(1200px 700px at 50% 0%, #2a3445, #10151d 70%) fixed #10151d;
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -117,134 +111,17 @@ button {
   outline-offset: 2px;
 }
 
-/* ---------- Carcasa del equipo ---------- */
-
-.bench {
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chassis {
-  width: 100%;
-  max-width: 1360px;
-  padding: 14px 22px 0;
-  border-radius: 28px 28px 18px 18px;
-  background: linear-gradient(180deg, var(--shell-hi), var(--shell) 40%, var(--shell-lo));
-  box-shadow:
-    inset 0 2px 0 rgb(255 255 255 / 0.8),
-    inset 0 -3px 8px rgb(0 0 0 / 0.12),
-    0 30px 60px -20px rgb(0 0 0 / 0.8);
-  color: var(--shell-ink);
-  overflow: hidden;
-}
-
-.chassis__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 6px 12px;
-  user-select: none;
-}
-
-.chassis__brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.chassis__brand p {
-  margin: 0;
-}
-
-.chassis__logo {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #3b8af5, var(--bezel));
-  color: white;
-  font: 800 11px var(--font-mono);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
-}
-
-.chassis__model {
-  font: 800 15px var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2c3a50;
-}
-
-.chassis__sub {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-
-.leds {
-  display: flex;
-  gap: 18px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font: 700 10px var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.led {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  --led: #9aa5b4;
-}
-.led__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--led);
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.08), 0 0 8px var(--led);
-}
-.led--off .led__dot {
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.08);
-}
-.led--ok {
-  --led: #10b981;
-}
-.led--heat {
-  --led: #f59e0b;
-}
-.led--heat .led__dot,
-.led--run .led__dot {
-  animation: pulse 1.2s ease-in-out infinite;
-}
-.led--run {
-  --led: #22d3ee;
-}
-.led--idle {
-  --led: #60a5fa;
-}
-
-/* Marco azul de la pantalla táctil */
-.bezel {
-  padding: 12px;
-  border-radius: 22px;
-  background: linear-gradient(160deg, #3a86f0, var(--bezel) 45%, #134aa6);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 4px 10px rgb(0 0 0 / 0.25);
-}
+/* ---------- Pantalla del equipo: ocupa todo el viewport ---------- */
 
 .screen {
   display: flex;
   flex-direction: column;
-  height: max(560px, calc(100dvh - 200px));
-  border-radius: 12px;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   container: screen / inline-size;
   background: var(--bg);
   color: var(--text);
-  box-shadow: inset 0 0 0 2px #06101d, inset 0 6px 18px rgb(0 0 0 / 0.6);
 }
 
 .screen__body {
@@ -253,49 +130,9 @@ button {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 20px;
+  padding: 20px max(20px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   container-type: inline-size;
   background: radial-gradient(900px 500px at 50% 0%, #0f2240, transparent 70%), var(--bg);
-}
-
-/* Frontal: rejilla de ventilación, bandeja de muestras y puerto USB */
-.chassis__front {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: 44px;
-  padding: 0 10px;
-}
-.chassis__vents {
-  width: 180px;
-  height: 14px;
-  border-radius: 4px;
-  background: repeating-linear-gradient(90deg, #aeb7c3 0 5px, transparent 5px 10px);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
-}
-.chassis__drawer {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #b3bcc8, #eef1f5);
-}
-.chassis__usb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: 700 10px var(--font-mono);
-}
-.chassis__usb span {
-  width: 26px;
-  height: 11px;
-  border-radius: 2px;
-  background: #2a3342;
-  box-shadow: inset 0 0 0 3px #4a5566;
-}
-.chassis__base {
-  height: 12px;
-  margin: 0 -22px;
-  background: linear-gradient(180deg, #3a86f0, var(--bezel));
 }
 
 .loading {
@@ -2241,37 +2078,8 @@ button {
   }
 }
 
-/* Teléfono o tablet pequeña: sin carcasa, la pantalla del equipo ocupa
-   todo el viewport (también en horizontal, donde falta altura). */
+/* Teléfono o tablet pequeña: márgenes más ajustados y safe areas (notch) */
 @media (max-width: 720px), (max-height: 560px) and (pointer: coarse) {
-  .bench {
-    display: block;
-    padding: 0;
-  }
-  .chassis {
-    max-width: none;
-    padding: 0;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-  }
-  .chassis__top,
-  .chassis__front,
-  .chassis__base {
-    display: none;
-  }
-  .bezel {
-    padding: 0;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-  }
-  .screen {
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    box-shadow: none;
-  }
   .statusbar {
     gap: 8px;
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));

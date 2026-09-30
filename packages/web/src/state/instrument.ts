@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { MachineRunState, PCRProtocol } from '../cycler/types/pcr';
 
 // Estado publicado por el termociclador (cycler/CyclerApp) para el resto
-// de la interfaz: barra de estado, LEDs de la carcasa e inicio. También
+// de la interfaz: barra de estado e inicio. También
 // lleva la petición de carga de un programa enviado desde el editor.
 
 export interface InstrumentState {

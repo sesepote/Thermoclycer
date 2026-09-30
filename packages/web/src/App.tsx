@@ -1,5 +1,4 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Chassis } from './components/device/Chassis';
 import { StatusBar } from './components/device/StatusBar';
 import { AppProvider, useApp } from './state/app';
 import { KEEP_ALIVE_VIEWS, findView, preloadViews } from './views';
@@ -7,17 +6,17 @@ import { KEEP_ALIVE_VIEWS, findView, preloadViews } from './views';
 export default function App() {
   return (
     <AppProvider>
-      <Chassis>
+      <div className="screen">
         <Screen />
-      </Chassis>
+      </div>
     </AppProvider>
   );
 }
 
 const loading = <p className="loading">Cargando…</p>;
 
-// Pantalla táctil del equipo: barra de estado fija + pantalla activa,
-// que hace scroll dentro del marco (no la página entera).
+// Pantalla táctil del equipo a pantalla completa: barra de estado fija +
+// pantalla activa, que hace scroll por dentro (no la página entera).
 function Screen() {
   const { view } = useApp();
   const current = findView(view);

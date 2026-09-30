@@ -5,9 +5,7 @@ import {
   Repeat, 
   Flame, 
   Save, 
-  Play, 
-  Clock, 
-  Thermometer 
+  Play
 } from 'lucide-react';
 import { playKeyClick } from '../utils/audio';
 
@@ -18,8 +16,6 @@ interface BottomToolbarProps {
   onOpenGradient: () => void;
   onOpenSave: () => void;
   onStartRun: () => void;
-  onEditSelectedTemp: () => void;
-  onEditSelectedTime: () => void;
   canDelete: boolean;
   isGradientActive: boolean;
   isRunning: boolean;
@@ -32,8 +28,6 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onOpenGradient,
   onOpenSave,
   onStartRun,
-  onEditSelectedTemp,
-  onEditSelectedTime,
   canDelete,
   isGradientActive,
   isRunning,
@@ -71,31 +65,6 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           <Trash2 className="w-4 h-4 text-red-400" />
           <span className="hidden sm:inline">Eliminar Paso</span>
           <span className="sm:hidden">- Paso</span>
-        </button>
-
-        {/* Quick Temp & Time Touch Buttons */}
-        <button
-          onClick={() => {
-            playKeyClick();
-            onEditSelectedTemp();
-          }}
-          className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-cyan-300 text-xs font-semibold transition-all shadow-sm"
-          title="Modificar Temperatura del paso"
-        >
-          <Thermometer className="w-4 h-4 text-cyan-400" />
-          <span>Temp</span>
-        </button>
-
-        <button
-          onClick={() => {
-            playKeyClick();
-            onEditSelectedTime();
-          }}
-          className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-cyan-300 text-xs font-semibold transition-all shadow-sm"
-          title="Modificar Tiempo del paso"
-        >
-          <Clock className="w-4 h-4 text-cyan-400" />
-          <span>Tiempo</span>
         </button>
       </div>
 

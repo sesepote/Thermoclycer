@@ -18,10 +18,11 @@ import { instrument, useInstrument } from '../state/instrument';
 const STORAGE_KEY_CURRENT = 't5000_current_protocol';
 const STORAGE_KEY_USER_PROTOCOLS = 't5000_user_protocols';
 
-// Pantalla del termociclador (proyecto Termociclador-solo) sin su propia
-// carcasa: la pone la aplicación. Publica su estado en state/instrument
-// para la barra de estado, los LEDs y el inicio, y acepta programas
-// enviados desde el editor de protocolo.
+// Pantalla del termociclador (proyecto Termociclador-solo) sin su
+// carcasa. Publica su estado en state/instrument para la barra de estado
+// y el inicio, y acepta programas enviados desde el editor de protocolo.
+// La temperatura y el tiempo de un paso se editan tocando sus etiquetas
+// en el gráfico.
 export default function CyclerApp() {
   // Protocol State
   const [protocol, setProtocol] = useState<PCRProtocol>(() => {
@@ -324,8 +325,6 @@ export default function CyclerApp() {
               playConfirmBeep();
               startRun();
             }}
-            onEditSelectedTemp={() => setActiveModal('temp_numpad')}
-            onEditSelectedTime={() => setActiveModal('time_numpad')}
             canDelete={protocol.steps.length > 2}
             isGradientActive={Boolean(currentStep?.gradient?.enabled)}
             isRunning={isRunning}

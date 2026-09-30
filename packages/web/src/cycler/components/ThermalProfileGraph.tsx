@@ -15,6 +15,26 @@ interface ThermalProfileGraphProps {
   isInteractive?: boolean;
 }
 
+// Etiquetas de temperatura/tiempo: son la única forma de editar un paso,
+// así que tienen área de toque ampliada y se activan también con teclado.
+function touchLabel(label: string, activate: () => void) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': label,
+    className: 'group cursor-pointer',
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      activate();
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      activate();
+    },
+  } as const;
+}
+
 export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
   protocol,
   selectedStepIndex,
@@ -371,12 +391,9 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
                 {/* Temperature Value Touch Label (Above plateau) */}
                 <g
                   transform={`translate(${geom.midX}, ${geom.y - 18})`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isInteractive) onEditTemperature(geom.idx);
-                  }}
-                  className="group"
+                  {...touchLabel(`Editar temperatura del paso ${geom.idx + 1}`, () => isInteractive && onEditTemperature(geom.idx))}
                 >
+                  <rect x="-38" y="-18" width="76" height="30" fill="transparent" />
                   <rect
                     x="-32"
                     y="-12"
@@ -411,12 +428,9 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
                 {/* Duration Value Touch Label (Below plateau) */}
                 <g
                   transform={`translate(${geom.midX}, ${geom.y + 22})`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isInteractive) onEditTime(geom.idx);
-                  }}
-                  className="group"
+                  {...touchLabel(`Editar tiempo del paso ${geom.idx + 1}`, () => isInteractive && onEditTime(geom.idx))}
                 >
+                  <rect x="-32" y="-14" width="64" height="28" fill="transparent" />
                   <rect
                     x="-26"
                     y="-10"
@@ -562,18 +576,6 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => isInteractive && onEditTemperature(selectedStepIndex)}
-            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors"
-          >
-            Editar Temp
-          </button>
-          <button
-            onClick={() => isInteractive && onEditTime(selectedStepIndex)}
-            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors"
-          >
-            Editar Tiempo
-          </button>
           <button
             onClick={() => isInteractive && onOpenGradient(selectedStepIndex)}
             className={`px-2.5 py-1 rounded border font-mono text-[11px] transition-colors flex items-center gap-1 ${
