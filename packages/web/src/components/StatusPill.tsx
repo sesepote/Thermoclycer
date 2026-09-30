@@ -1,13 +1,13 @@
-import { STATE_LABELS } from '../lib/labels';
-import { useSimulation } from '../state/simulation';
+import { RUN_LABELS } from '../lib/labels';
+import { useInstrument } from '../state/instrument';
 
-// Solo se suscribe al estado (no al tiempo), así que no se re-renderiza en cada frame.
+// Solo se suscribe al estado del equipo (no a las temperaturas).
 export function StatusPill() {
-  const state = useSimulation(s => s.snapshot.state);
+  const run = useInstrument(s => s.run);
   return (
-    <span className={`status-pill status-pill--${state.toLowerCase()}`} role="status">
+    <span className={`status-pill status-pill--${run}`} role="status">
       <span className="status-pill__dot" aria-hidden="true" />
-      {STATE_LABELS[state]}
+      {RUN_LABELS[run]}
     </span>
   );
 }

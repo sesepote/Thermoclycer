@@ -16,6 +16,7 @@ interface ViewDef {
   icon: LucideIcon;
   component: ComponentType;
   preload?: () => Promise<unknown>;
+  keepAlive?: boolean; // sigue montada (oculta) al salir: el equipo no se para al navegar
 }
 
 const lazyView = (load: () => Promise<{ default: ComponentType }>) => ({ component: lazy(load), preload: load });
@@ -23,7 +24,7 @@ const lazyView = (load: () => Promise<{ default: ComponentType }>) => ({ compone
 export const VIEWS = [
   { id: 'home', label: 'Inicio', description: 'Pantalla principal', icon: Home, component: HomeView },
   { id: 'program', label: 'Programa', description: 'Editar protocolo y plantillas', icon: FilePlus2, ...lazyView(() => import('./ProgramView')) },
-  { id: 'run', label: 'Ejecutar', description: 'Panel del termociclador', icon: Play, ...lazyView(() => import('./RunView')) },
+  { id: 'run', label: 'Termociclador', description: 'Panel del termociclador', icon: Play, keepAlive: true, ...lazyView(() => import('./RunView')) },
   { id: 'primers', label: 'Primers', description: 'Tm, GC e hibridación', icon: Dna, ...lazyView(() => import('./PrimerLab')) },
   { id: 'evaluation', label: 'Evaluación', description: 'Comparar con la referencia', icon: ClipboardCheck, ...lazyView(() => import('./EvaluationView')) },
   { id: 'knowledge', label: 'Sistema', description: 'Base de conocimiento y reglas', icon: BookOpen, ...lazyView(() => import('./KnowledgeView')) },
@@ -33,5 +34,7 @@ export type ViewId = (typeof VIEWS)[number]['id'];
 
 // Pantalla por id; un id desconocido lleva a Inicio.
 export const findView = (id: string) => VIEWS.find(v => v.id === id) ?? VIEWS[0];
+
+export const KEEP_ALIVE_VIEWS = VIEWS.filter(v => 'keepAlive' in v && v.keepAlive);
 
 export const preloadViews = () => VIEWS.forEach(v => 'preload' in v && v.preload());

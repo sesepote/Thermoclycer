@@ -33,15 +33,18 @@ src/
   views/index.ts       registro de pantallas (iconos de inicio, rutas #/id, carga diferida)
   views/HomeView.tsx   pantalla de inicio: telemetría, accesos en órbita, plantillas
   views/ProgramView    editor de protocolo + vista previa del perfil
-  views/RunView        panel de ejecución: lecturas, etapas, perfil, placa, transporte
+  views/RunView        termociclador (cycler/), montado de forma persistente
   views/*.tsx          resto de pantallas (primers, evaluación, sistema)
-  state/simulation.ts  store externo: simulación, bucle rAF y rampas de bloque y tapa
+  cycler/              termociclador de Termociclador-solo sin su carcasa: editor táctil
+                       del perfil, gradiente, bucles, biblioteca, monitor de corrida y
+                       placa de 96 pocillos (Tailwind v4, acotado a esta carpeta)
+  state/instrument.ts  store externo: lecturas que el termociclador publica para la
+                       barra de estado, los LEDs y el inicio; carga de programas
   state/app.tsx        contexto: vista activa y borrador del editor
   components/device/   carcasa (LEDs, marco, frontal) y barra de estado
-  components/run/      diagrama de etapas del panel de ejecución
-  components/          piezas reutilizables (editor, perfil térmico, placa…)
+  components/          piezas reutilizables (editor, perfil térmico…)
   hooks/               usePressRepeat, useClock
-  lib/                 conversión editor ⇄ protocolo, formato, base de conocimiento
+  lib/                 conversión editor ⇄ protocolo ⇄ termociclador, formato, base de conocimiento
 ```
 
 ### Cómo escalar
@@ -54,7 +57,7 @@ src/
 
 ### Rendimiento
 
-La simulación vive fuera de React (`state/simulation.ts`) y los componentes se suscriben con selectores, así que cada frame solo re-renderiza las lecturas grandes del panel, la barra del paso actual y el marcador del perfil térmico. Las temperaturas de la barra de estado se redondean a 0,1 °C en el selector, así que solo cambian cuando cambia el dígito. El resto (editor, placa de 96 pocillos, diagrama de etapas…) está memorizado.
+El termociclador publica sus lecturas en `state/instrument.ts` (solo notifica si algo cambió) y el resto de la interfaz se suscribe con selectores, así que la barra de estado, los LEDs y el inicio solo se re-renderizan cuando cambia el valor que muestran. El termociclador y sus estilos Tailwind viajan en un chunk diferido; la pantalla sigue montada (oculta) al navegar, para que una corrida no se pare.
 
 ### Pantalla táctil
 
@@ -62,7 +65,7 @@ La simulación vive fuera de React (`state/simulation.ts`) y los componentes se 
 - Botones −/+ que repiten y aceleran al mantenerlos pulsados.
 - La interfaz imita un termociclador de sobremesa: carcasa gris con LEDs, pantalla táctil con marco azul y frontal con USB. En móvil la carcasa desaparece y la pantalla del equipo ocupa todo el viewport.
 - Navegación como en el equipo: pantalla de inicio con iconos grandes y botón de inicio siempre visible en la barra de estado; el botón "atrás" del sistema también navega.
-- Los controles de ejecución quedan fijos al pie de la pantalla y detener pide confirmación.
+- El termociclador tiene teclado numérico táctil, bucles de ciclos, gradiente por columnas, biblioteca de protocolos, pitidos de equipo y monitor de corrida con placa de 96 pocillos; abortar pide confirmación. "Cargar en el termociclador" en Programa le envía el protocolo del editor.
 - El perfil térmico se inspecciona arrastrando el dedo (o pasando el ratón).
 - La tabla de evaluación se muestra como tarjetas en pantallas estrechas; se respetan las safe areas (notch) y la app es instalable (manifiesto web).
 
@@ -73,8 +76,8 @@ La simulación vive fuera de React (`state/simulation.ts`) y los componentes se 
 - **Fase 3** — motor de reglas (`core/src/rules`)
 - **Fase 4** — motor de cálculo (`core/src/calculations`)
 - **Fase 5** — validador de protocolos (`core/src/protocols`)
-- **Fase 8** (parcial, lo justo para la UI) — simulación (`core/src/simulation`): máquina de estados + cálculo de temporización; el reloj lo lleva la web con `requestAnimationFrame`
-- **Fase 9** — interfaz gráfica (`packages/web`): pantalla de inicio, editor de protocolo, panel de ejecución, laboratorio de primers, evaluación y base de conocimiento
+- **Fase 8** (parcial, lo justo para la UI) — simulación (`core/src/simulation`): máquina de estados + cálculo de temporización (la web usa el motor propio del termociclador, `cycler/hooks/usePCRRunner.ts`)
+- **Fase 9** — interfaz gráfica (`packages/web`): pantalla de inicio, editor de protocolo, termociclador, laboratorio de primers, evaluación y base de conocimiento
 
 ## Qué falta
 

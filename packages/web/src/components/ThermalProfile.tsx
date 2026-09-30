@@ -2,7 +2,6 @@ import { PointerEvent, memo, useEffect, useId, useMemo, useRef, useState } from 
 import { Protocol } from '@thermocycler/core';
 import { formatClock, formatDuration, temperatureColor } from '../lib/format';
 import { STEP_TYPE_LABELS } from '../lib/labels';
-import { useSimulation } from '../state/simulation';
 
 // Coordenadas en unidades del viewBox (el SVG se estira al ancho disponible).
 const WIDTH = 1000;
@@ -87,13 +86,8 @@ function segmentAt(segments: Segment[], seconds: number): Segment | undefined {
 
 /* ---------- Componente ---------- */
 
-interface ThermalProfileProps {
-  protocol: Protocol;
-  isDraft: boolean;
-  active: boolean;
-}
-
-export const ThermalProfile = memo(function ThermalProfile({ protocol, isDraft, active }: ThermalProfileProps) {
+// Vista previa del perfil del protocolo en edición.
+export const ThermalProfile = memo(function ThermalProfile({ protocol }: { protocol: Protocol }) {
   const gradientId = useId();
   const timeline = useMemo(() => buildTimeline(protocol), [protocol]);
   const { bands, total, span, line, area } = timeline;
@@ -109,7 +103,7 @@ export const ThermalProfile = memo(function ThermalProfile({ protocol, isDraft, 
           </h2>
         </div>
         <div className="profile__meta">
-          {isDraft && <span className="tag tag--muted">Vista previa del borrador</span>}
+          <span className="tag tag--muted">Vista previa</span>
           <span className="tag">{formatDuration(total)} + hold</span>
         </div>
       </header>
@@ -156,7 +150,6 @@ export const ThermalProfile = memo(function ThermalProfile({ protocol, isDraft, 
             ))}
 
             <path d={area} fill={`url(#${gradientId})`} opacity={0.18} />
-            {active && <ProgressOverlay timeline={timeline} gradientId={gradientId} />}
             <path d={line} className="profile__line" vectorEffect="non-scaling-stroke" />
 
             {inspector.point && (
@@ -184,31 +177,6 @@ export const ThermalProfile = memo(function ThermalProfile({ protocol, isDraft, 
         </div>
       </div>
     </section>
-  );
-});
-
-/* ---------- Progreso en vivo: único trozo que se actualiza por frame ---------- */
-
-const ProgressOverlay = memo(function ProgressOverlay({ timeline, gradientId }: { timeline: Timeline; gradientId: string }) {
-  const clipId = useId();
-  const elapsed = useSimulation(s => s.snapshot.elapsedSeconds);
-  const { segments, total, span, area } = timeline;
-
-  // Durante el hold el marcador se queda en mitad de su banda.
-  const seconds = elapsed >= total && span > total ? total + (span - total) / 2 : elapsed;
-  const x = span > 0 ? (Math.min(seconds, span) / span) * WIDTH : 0;
-  const segment = segmentAt(segments, seconds);
-  const y = segment ? yFor(segment.temperature) : HEIGHT;
-
-  return (
-    <>
-      <clipPath id={clipId}>
-        <rect x={0} y={0} width={x} height={HEIGHT} />
-      </clipPath>
-      <path d={area} fill={`url(#${gradientId})`} opacity={0.75} clipPath={`url(#${clipId})`} />
-      <line x1={x} x2={x} y1={0} y2={HEIGHT} className="profile__marker" vectorEffect="non-scaling-stroke" />
-      <circle cx={x} cy={y} r={5} className="profile__dot" vectorEffect="non-scaling-stroke" />
-    </>
   );
 });
 

@@ -1,8 +1,8 @@
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Chassis } from './components/device/Chassis';
 import { StatusBar } from './components/device/StatusBar';
 import { AppProvider, useApp } from './state/app';
-import { findView, preloadViews } from './views';
+import { KEEP_ALIVE_VIEWS, findView, preloadViews } from './views';
 
 export default function App() {
   return (
@@ -14,12 +14,24 @@ export default function App() {
   );
 }
 
+const loading = <p className="loading">Cargando…</p>;
+
 // Pantalla táctil del equipo: barra de estado fija + pantalla activa,
 // que hace scroll dentro del marco (no la página entera).
 function Screen() {
   const { view } = useApp();
-  const { id, component: View } = findView(view);
+  const current = findView(view);
+  const { id } = current;
+  const View = current.component;
   const body = useRef<HTMLElement>(null);
+
+  // Las pantallas keepAlive (el termociclador) siguen montadas y ocultas
+  // tras la primera visita, para que una corrida no se pare al navegar.
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set());
+  const isKeepAlive = KEEP_ALIVE_VIEWS.some(v => v.id === id);
+  useEffect(() => {
+    if (isKeepAlive) setVisited(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, [id, isKeepAlive]);
 
   // Precarga las pantallas diferidas cuando el navegador está libre,
   // para que el primer toque en un icono sea instantáneo.
@@ -35,9 +47,14 @@ function Screen() {
     <>
       <StatusBar viewId={id} />
       <main ref={body} className={`screen__body screen__body--${id}`}>
-        <Suspense fallback={<p className="loading">Cargando…</p>}>
-          <View />
-        </Suspense>
+        {!isKeepAlive && <Suspense fallback={loading}>{<View />}</Suspense>}
+        {KEEP_ALIVE_VIEWS.filter(v => v.id === id || visited.has(v.id)).map(({ id: keepId, component: Kept }) => (
+          <div key={keepId} className="keep-alive" hidden={keepId !== id}>
+            <Suspense fallback={loading}>
+              <Kept />
+            </Suspense>
+          </div>
+        ))}
       </main>
     </>
   );

@@ -1,5 +1,5 @@
 import { ReactNode, memo, useMemo } from 'react';
-import { CircleAlert, CircleCheck, Play, Plus, Repeat, Save } from 'lucide-react';
+import { CircleAlert, CircleCheck, Plus, Repeat, Save } from 'lucide-react';
 import { calculateTotalRuntime, cycleDuration, validateProtocol } from '@thermocycler/core';
 import { EditorPhase, EditorState, EditorStep, PROTOCOL_PRESETS, PhaseKey, buildProtocol, newStepId } from '../lib/editorState';
 import { cssVars, formatDuration, temperatureColor } from '../lib/format';
@@ -11,9 +11,7 @@ interface ProtocolEditorProps {
   state: EditorState;
   onChange: (next: EditorState) => void;
   onSave: () => void;
-  isDirty: boolean;
-  locked: boolean;
-  validationError?: string;
+  locked: boolean; // el equipo está en marcha
 }
 
 // Configuración de las fases opcionales. Una fase nueva del mismo tipo
@@ -69,7 +67,7 @@ function PhaseBlock({ config: { title, temp, durationStep }, phase, disabled, on
 
 // memo: el editor es la parte más pesada del formulario y no debe
 // re-renderizarse por cambios ajenos (p. ej. el reloj de la simulación).
-export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, onSave, isDirty, locked, validationError }: ProtocolEditorProps) {
+export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, onSave, locked }: ProtocolEditorProps) {
   const protocol = useMemo(() => buildProtocol(state), [state]);
   const validation = useMemo(() => validateProtocol(protocol), [protocol]);
   const runtime = useMemo(() => calculateTotalRuntime(protocol), [protocol]);
@@ -175,14 +173,14 @@ export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, on
 
       {/* Validación + carga en el equipo */}
       <footer className="editor__footer">
-        {validation.valid && !validationError ? (
+        {validation.valid ? (
           <p className="validation validation--ok">
             <CircleCheck size={16} aria-hidden="true" />
             Protocolo válido
           </p>
         ) : (
           <ul className="validation validation--error" aria-live="polite">
-            {[validationError, ...validation.issues.map(i => i.message)].filter(Boolean).map((message, i) => (
+            {validation.issues.map(({ message }, i) => (
               <li key={i}>
                 <CircleAlert size={16} aria-hidden="true" />
                 {message}
@@ -191,10 +189,9 @@ export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, on
           </ul>
         )}
 
-        {/* Sin cambios pendientes, el botón lleva directamente al panel de ejecución */}
-        <button type="button" className="btn btn--primary btn--lg" onClick={onSave} disabled={isDirty && (locked || !validation.valid)}>
-          {isDirty ? <Save size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-          {isDirty ? 'Cargar en el equipo' : 'Abrir panel de ejecución'}
+        <button type="button" className="btn btn--primary btn--lg" onClick={onSave} disabled={locked || !validation.valid}>
+          <Save size={16} aria-hidden="true" />
+          {locked ? 'Termociclador en marcha' : 'Cargar en el termociclador'}
         </button>
       </footer>
     </section>

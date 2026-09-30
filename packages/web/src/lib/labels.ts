@@ -1,24 +1,15 @@
-import { SimulationPhase, SimulationState, StepType } from '@thermocycler/core';
+import { StepType } from '@thermocycler/core';
+import type { MachineRunState } from '../cycler/types/pcr';
 
-// Textos de la interfaz para los valores del core, en un único sitio.
+// Textos de la interfaz para los valores del core y del equipo, en un único sitio.
 
-export const STATE_LABELS: Record<SimulationState, string> = {
-  IDLE: 'Sin programar',
-  PROGRAMMED: 'Listo',
-  RUNNING: 'En marcha',
-  PAUSED: 'En pausa',
-  COMPLETED: 'Completado',
-  STOPPED: 'Detenido',
-  ERROR: 'Error',
-};
-
-export const PHASE_LABELS: Record<SimulationPhase, string> = {
+export const RUN_LABELS: Record<MachineRunState, string> = {
   idle: 'En espera',
-  initial: 'Desnaturalización inicial',
-  cycle: 'Ciclado',
-  final_extension: 'Extensión final',
-  hold: 'Mantenimiento',
-  completed: 'Finalizado',
+  preheating_lid: 'Calentando tapa',
+  running: 'En marcha',
+  paused: 'En pausa',
+  holding: 'Conservación',
+  completed: 'Completado',
 };
 
 export const STEP_TYPE_LABELS: Record<StepType, string> = {

@@ -1,5 +1,5 @@
 import { ReactNode, memo } from 'react';
-import { LID_SETPOINT, useSimulation } from '../../state/simulation';
+import { isActiveRun, useInstrument } from '../../state/instrument';
 
 // Carcasa física del termociclador: marca y LEDs arriba, pantalla
 // táctil con marco azul en el centro y frontal (rejilla, bandeja, USB,
@@ -43,10 +43,10 @@ export function Chassis({ children }: { children: ReactNode }) {
 /* ---------- LEDs del frontal: solo cambian con el estado o la tapa ---------- */
 
 const Leds = memo(function Leds() {
-  const state = useSimulation(s => s.snapshot.state);
-  const lidHot = useSimulation(s => s.lidTemperature >= LID_SETPOINT - 1);
-  const running = state === 'RUNNING';
-  const lidOn = running || state === 'PAUSED';
+  const run = useInstrument(s => s.run);
+  const lidHot = useInstrument(s => s.lidTemperature >= s.lidTarget - 1);
+  const running = run === 'running' || run === 'preheating_lid' || run === 'holding';
+  const lidOn = isActiveRun(run);
 
   const leds = [
     { label: 'Power', tone: 'ok' },

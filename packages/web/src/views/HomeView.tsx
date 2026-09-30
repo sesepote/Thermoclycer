@@ -1,12 +1,11 @@
 import { memo } from 'react';
 import { BookOpen, ChevronRight, Cpu, FileStack, Flame, Play, Thermometer } from 'lucide-react';
-import { protocolDuration } from '@thermocycler/core';
 import { PROTOCOL_PRESETS } from '../lib/editorState';
-import { formatClock, formatDuration, temperatureColor } from '../lib/format';
+import { formatClock, temperatureColor } from '../lib/format';
 import { knowledgeBase } from '../lib/knowledge';
-import { PHASE_LABELS, STATE_LABELS } from '../lib/labels';
+import { RUN_LABELS } from '../lib/labels';
 import { useApp } from '../state/app';
-import { LID_SETPOINT, useSimulation, useTemperature } from '../state/simulation';
+import { isActiveRun, useInstrument } from '../state/instrument';
 import { VIEWS } from '.';
 
 // Colores de las esferas satélite, asignados en orden de registro.
@@ -66,8 +65,9 @@ export default function HomeView() {
 /* ---------- Telemetría: sensores, programa cargado y corrida ---------- */
 
 function Telemetry() {
-  const block = useTemperature('block');
-  const lid = useTemperature('lid');
+  const block = useInstrument(s => s.blockTemperature);
+  const lid = useInstrument(s => s.lidTemperature);
+  const lidTarget = useInstrument(s => s.lidTarget);
   return (
     <section className="telemetry" aria-label="Estado del equipo">
       <div className="tele tele--block">
@@ -83,7 +83,7 @@ function Telemetry() {
         <span className="tele__label">Tapa</span>
         <span className="tele__value mono">
           {lid.toFixed(1)}
-          <small>/{LID_SETPOINT} °C</small>
+          <small>/{lidTarget} °C</small>
         </span>
       </div>
       <ProgramSummary />
@@ -91,32 +91,23 @@ function Telemetry() {
   );
 }
 
-// Programa cargado y, si hay corrida, su fase y tiempo restante.
+// Programa del equipo y, si hay corrida, el paso, el ciclo y el tiempo restante.
 function ProgramSummary() {
-  const programmed = useSimulation(s => s.programmed);
-  const state = useSimulation(s => s.snapshot.state);
-  const phase = useSimulation(s => s.snapshot.phase);
-  const remaining = useSimulation(s => Math.ceil(s.snapshot.totalSeconds - s.snapshot.elapsedSeconds));
-  const active = state === 'RUNNING' || state === 'PAUSED';
+  const name = useInstrument(s => s.protocolName);
+  const run = useInstrument(s => s.run);
+  const step = useInstrument(s => s.stepName);
+  const cycle = useInstrument(s => s.cycle);
+  const cycles = useInstrument(s => s.totalCycles);
+  const remaining = useInstrument(s => s.remainingSeconds);
+  const active = isActiveRun(run);
 
-  if (!programmed) {
-    return (
-      <div className="tele tele--program tele--empty">
-        <FileStack size={18} aria-hidden="true" />
-        <span className="tele__label">Programa</span>
-        <span className="tele__text">Sin programa cargado</span>
-      </div>
-    );
-  }
   return (
-    <div className="tele tele--program">
+    <div className={`tele tele--program ${name ? '' : 'tele--empty'}`}>
       <FileStack size={18} aria-hidden="true" />
-      <span className="tele__label">{active ? PHASE_LABELS[phase] : 'Programa cargado'}</span>
+      <span className="tele__label">{active ? `${RUN_LABELS[run]} · ${step ?? ''}` : 'Programa en el equipo'}</span>
       <span className="tele__text">
-        <strong>{programmed.nombre}</strong>
-        <span className="mono">
-          {active ? `resta ${formatClock(remaining)}` : `${programmed.cycles.count} ciclos · ${formatDuration(protocolDuration(programmed))}`}
-        </span>
+        <strong>{name ?? 'Abre el termociclador para ver su programa'}</strong>
+        {name && <span className="mono">{active ? `ciclo ${cycle}/${cycles} · resta ${formatClock(remaining)}` : `${cycles} ciclos`}</span>}
       </span>
     </div>
   );
@@ -125,10 +116,10 @@ function ProgramSummary() {
 /* ---------- Esfera central: acceso al panel de ejecución ---------- */
 
 const RunSphere = memo(function RunSphere({ onOpen }: { onOpen: () => void }) {
-  const state = useSimulation(s => s.snapshot.state);
-  const pct = useSimulation(s => Math.floor(s.snapshot.progressFraction * 100));
-  const hasProgram = useSimulation(s => s.programmed !== null);
-  const running = state === 'RUNNING';
+  const run = useInstrument(s => s.run);
+  const pct = useInstrument(s => Math.floor(s.progress * 100));
+  const active = isActiveRun(run);
+  const running = active && run !== 'paused';
 
   return (
     <button type="button" className={`sphere sphere--core ${running ? 'is-running' : ''}`} onClick={onOpen}>
@@ -136,9 +127,9 @@ const RunSphere = memo(function RunSphere({ onOpen }: { onOpen: () => void }) {
       <span className="sphere__icon sphere__icon--lg" aria-hidden="true">
         {running ? <Cpu size={34} /> : <Play size={34} />}
       </span>
-      <span className="sphere__tag">{STATE_LABELS[state]}</span>
-      <span className="sphere__label">Ejecutar</span>
-      <span className="sphere__desc">{running || state === 'PAUSED' ? `${pct}% completado` : hasProgram ? 'Abrir panel e iniciar' : 'Panel del termociclador'}</span>
+      <span className="sphere__tag">{RUN_LABELS[run]}</span>
+      <span className="sphere__label">Termociclador</span>
+      <span className="sphere__desc">{active ? `${pct}% completado` : 'Programar y ejecutar'}</span>
     </button>
   );
 });
@@ -147,7 +138,7 @@ const RunSphere = memo(function RunSphere({ onOpen }: { onOpen: () => void }) {
 
 function Templates() {
   const { setEditor, goTo } = useApp();
-  const locked = useSimulation(s => s.snapshot.state === 'RUNNING');
+  const locked = useInstrument(s => isActiveRun(s.run));
   return (
     <section className="dock-card" aria-labelledby="templates-title">
       <h2 id="templates-title" className="dock-card__title">

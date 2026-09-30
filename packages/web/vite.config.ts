@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,7 +10,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 // su dist/ compilado). Así, al tocar algo del motor durante desarrollo,
 // Vite lo recompila al vuelo junto con la web, sin pasos intermedios.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@thermocycler/core': path.resolve(dirname, '../core/src/index.ts'),

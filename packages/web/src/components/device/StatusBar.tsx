@@ -3,7 +3,7 @@ import { Flame, Home, Thermometer } from 'lucide-react';
 import { useClock } from '../../hooks/useClock';
 import { temperatureColor } from '../../lib/format';
 import { useApp } from '../../state/app';
-import { useTemperature } from '../../state/simulation';
+import { useInstrument } from '../../state/instrument';
 import { findView } from '../../views';
 import { StatusPill } from '../StatusPill';
 
@@ -35,7 +35,7 @@ export const StatusBar = memo(function StatusBar({ viewId }: { viewId: string })
 });
 
 function Sensor({ sensor }: { sensor: 'block' | 'lid' }) {
-  const temperature = useTemperature(sensor);
+  const temperature = useInstrument(s => (sensor === 'block' ? s.blockTemperature : s.lidTemperature));
   const isBlock = sensor === 'block';
   const Icon = isBlock ? Thermometer : Flame;
   return (
