@@ -1,0 +1,54 @@
+/* Estilos del termociclador (proyecto Termociclador-solo, en Tailwind v4).
+   Solo se generan las utilidades usadas en src/cycler y no se incluye el
+   preflight global: el reset va acotado a .cycler para no alterar el
+   resto de la aplicación, que usa su propia hoja (styles.css). */
+
+@layer theme, base, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@source './';
+
+@layer base {
+  .cycler *,
+  .cycler ::before,
+  .cycler ::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  .cycler button,
+  .cycler input,
+  .cycler select,
+  .cycler textarea {
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+  }
+  .cycler button:not(:disabled) {
+    cursor: pointer;
+  }
+  .cycler h1,
+  .cycler h2,
+  .cycler h3,
+  .cycler h4,
+  .cycler h5,
+  .cycler h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  .cycler ol,
+  .cycler ul {
+    list-style: none;
+  }
+  .cycler svg,
+  .cycler img {
+    display: block;
+    vertical-align: middle;
+  }
+  .cycler table {
+    border-collapse: collapse;
+  }
+}

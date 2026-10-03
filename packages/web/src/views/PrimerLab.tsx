@@ -1,22 +1,18 @@
 import { useMemo, useState } from 'react';
 import { ArrowRight, TriangleAlert } from 'lucide-react';
-import {
-  calculateAnnealingTemperatureRange,
-  calculateGcContent,
-  calculateLength,
-  calculateTm,
-} from '@thermocycler/core';
+import { Base, analyzeSequence, calculateAnnealingTemperatureRange, calculateTm } from '@thermocycler/core';
 import { demoAssay } from '../lib/knowledge';
 import { temperatureColor } from '../lib/format';
+import { useApp } from '../state/app';
 
-const BASES = ['A', 'T', 'G', 'C'] as const;
+const BASES: Base[] = ['A', 'T', 'G', 'C'];
+const SCALE = { min: 40, max: 80 };
+const TICKS = [40, 50, 60, 70, 80];
 
-function baseCounts(sequence: string) {
-  const clean = sequence.toUpperCase().replace(/[^ATGC]/g, '');
-  const counts = { A: 0, T: 0, G: 0, C: 0 };
-  for (const b of clean) counts[b as keyof typeof counts]++;
-  return { counts, total: clean.length };
-}
+// Posición (%) de una temperatura en la escala de hibridación.
+const pct = (t: number) => `${((Math.min(SCALE.max, Math.max(SCALE.min, t)) - SCALE.min) / (SCALE.max - SCALE.min)) * 100}%`;
+
+/* ---------- Tarjeta de un primer ---------- */
 
 interface PrimerCardProps {
   title: string;
@@ -26,12 +22,12 @@ interface PrimerCardProps {
 }
 
 function PrimerCard({ title, direction, sequence, onChange }: PrimerCardProps) {
-  const length = useMemo(() => calculateLength(sequence), [sequence]);
-  const gc = useMemo(() => calculateGcContent(sequence), [sequence]);
+  // Un único análisis de la secuencia alimenta longitud, GC y composición.
+  const analysis = useMemo(() => analyzeSequence(sequence), [sequence]);
   const tm = useMemo(() => calculateTm(sequence), [sequence]);
-  const { counts, total } = useMemo(() => baseCounts(sequence), [sequence]);
+  const stats = analysis.ok ? analysis.stats : undefined;
+  const gc = stats ? (stats.gc / stats.length) * 100 : undefined;
   const id = `primer-${direction}`;
-  const gcValue = gc.ok ? gc.result.value : undefined;
 
   return (
     <article className="card primer">
@@ -51,32 +47,32 @@ function PrimerCard({ title, direction, sequence, onChange }: PrimerCardProps) {
         className="primer__seq mono"
         rows={3}
         spellCheck={false}
+        autoCapitalize="characters"
+        autoCorrect="off"
         value={sequence}
         onChange={e => onChange(e.target.value.toUpperCase())}
       />
 
-      <div className="seq-view mono" aria-hidden="true">
-        {sequence
-          .toUpperCase()
-          .split('')
-          .map((b, i) => (
-            <span key={i} className={`base base--${/[ATGC]/.test(b) ? b : 'x'}`}>
-              {b}
-            </span>
-          ))}
+      {/* Secuencia coloreada por base */}
+      <div className="seq-view mono" aria-hidden="true" data-no-swipe>
+        {[...sequence].map((b, i) => (
+          <span key={i} className={`base base--${'ATGC'.includes(b) ? b : 'x'}`}>
+            {b}
+          </span>
+        ))}
       </div>
 
       <div className="metrics">
         <div className="metric">
           <span className="metric__label">Longitud</span>
-          <span className="metric__value mono">{length.ok ? `${length.result.value} nt` : '—'}</span>
+          <span className="metric__value mono">{stats ? `${stats.length} nt` : '—'}</span>
         </div>
         <div className="metric">
           <span className="metric__label">Contenido GC</span>
-          <span className="metric__value mono">{gcValue !== undefined ? `${gcValue.toFixed(1)}%` : '—'}</span>
+          <span className="metric__value mono">{gc !== undefined ? `${gc.toFixed(1)}%` : '—'}</span>
           <div className="meter" aria-hidden="true">
             <span className="meter__ideal" />
-            <span className="meter__fill" style={{ width: `${gcValue ?? 0}%` }} />
+            <span className="meter__fill" style={{ width: `${gc ?? 0}%` }} />
           </div>
         </div>
         <div className="metric">
@@ -88,57 +84,38 @@ function PrimerCard({ title, direction, sequence, onChange }: PrimerCardProps) {
         </div>
       </div>
 
-      {total > 0 && (
+      {/* Composición de bases */}
+      {stats && (
         <div className="composition" aria-label="Composición de bases">
           {BASES.map(b => (
-            <span
-              key={b}
-              className={`composition__seg base--${b}`}
-              style={{ flexGrow: counts[b] || 0.0001 }}
-              title={`${b}: ${counts[b]}`}
-            >
-              {counts[b] > 0 && `${b} ${counts[b]}`}
+            <span key={b} className={`composition__seg base--${b}`} style={{ flexGrow: stats.counts[b] || 0.0001 }} title={`${b}: ${stats.counts[b]}`}>
+              {stats.counts[b] > 0 && `${b} ${stats.counts[b]}`}
             </span>
           ))}
         </div>
       )}
 
-      {!tm.ok && (
+      {!analysis.ok && (
         <p className="notice notice--warn">
           <TriangleAlert size={16} aria-hidden="true" />
-          {tm.reason}
+          {analysis.reason}
         </p>
       )}
     </article>
   );
 }
 
-interface PrimerLabProps {
-  annealingTemperature?: number;
-  onApplyAnnealing: (temperature: number) => void;
-}
+/* ---------- Vista: dos primers + rango de hibridación ---------- */
 
-export function PrimerLab({ annealingTemperature, onApplyAnnealing }: PrimerLabProps) {
+export default function PrimerLab() {
+  const annealingTemperature = useApp(s => s.annealingTemperature);
+  const applyAnnealing = useApp(s => s.applyAnnealing);
   const [forward, setForward] = useState(demoAssay?.primerForward?.secuencia ?? '');
   const [reverse, setReverse] = useState(demoAssay?.primerReverse?.secuencia ?? '');
 
-  const range = useMemo(
-    () =>
-      calculateAnnealingTemperatureRange(
-        { id: 'fwd', nombre: 'Forward', secuencia: forward },
-        { id: 'rev', nombre: 'Reverse', secuencia: reverse },
-      ),
-    [forward, reverse],
-  );
-
-  const inRange =
-    range.ok && annealingTemperature !== undefined
-      ? annealingTemperature >= range.result.value.min && annealingTemperature <= range.result.value.max
-      : undefined;
-
-  const scaleMin = 40;
-  const scaleMax = 80;
-  const pct = (t: number) => `${((Math.min(scaleMax, Math.max(scaleMin, t)) - scaleMin) / (scaleMax - scaleMin)) * 100}%`;
+  const range = useMemo(() => calculateAnnealingTemperatureRange({ secuencia: forward }, { secuencia: reverse }), [forward, reverse]);
+  const r = range.ok ? range.result.value : undefined;
+  const inRange = r && annealingTemperature !== undefined ? annealingTemperature >= r.min && annealingTemperature <= r.max : undefined;
 
   return (
     <div className="page">
@@ -146,8 +123,7 @@ export function PrimerLab({ annealingTemperature, onApplyAnnealing }: PrimerLabP
         <p className="eyebrow">Análisis de oligonucleótidos</p>
         <h1 className="page__title">Laboratorio de primers</h1>
         <p className="page__lead">
-          Edita las secuencias para calcular longitud, contenido GC y Tm, y obtener el rango de hibridación recomendado para tu
-          protocolo.
+          Edita las secuencias para calcular longitud, contenido GC y Tm, y obtener el rango de hibridación recomendado para tu protocolo.
         </p>
       </div>
 
@@ -171,15 +147,13 @@ export function PrimerLab({ annealingTemperature, onApplyAnnealing }: PrimerLabP
           )}
         </header>
 
-        {range.ok ? (
+        {range.ok && r ? (
           <>
+            {/* Escala visual: banda aceptable, recomendado y valor actual */}
             <div className="range-scale">
-              <div
-                className="range-scale__band"
-                style={{ left: pct(range.result.value.min), width: `calc(${pct(range.result.value.max)} - ${pct(range.result.value.min)})` }}
-              />
-              <div className="range-scale__rec" style={{ left: pct(range.result.value.recommended) }}>
-                <span className="mono">{range.result.value.recommended} °C</span>
+              <div className="range-scale__band" style={{ left: pct(r.min), width: `calc(${pct(r.max)} - ${pct(r.min)})` }} />
+              <div className="range-scale__rec" style={{ left: pct(r.recommended) }}>
+                <span className="mono">{r.recommended} °C</span>
               </div>
               {annealingTemperature !== undefined && (
                 <div className={`range-scale__user ${inRange ? 'is-ok' : 'is-bad'}`} style={{ left: pct(annealingTemperature) }}>
@@ -187,32 +161,32 @@ export function PrimerLab({ annealingTemperature, onApplyAnnealing }: PrimerLabP
                 </div>
               )}
               <div className="range-scale__ticks mono" aria-hidden="true">
-                {[40, 50, 60, 70, 80].map(t => (
+                {TICKS.map(t => (
                   <span key={t}>{t}°</span>
                 ))}
               </div>
             </div>
 
             <div className="annealing__summary">
-              <div className="metric">
-                <span className="metric__label">Mínimo</span>
-                <span className="metric__value mono">{range.result.value.min} °C</span>
-              </div>
-              <div className="metric metric--accent">
-                <span className="metric__label">Recomendado</span>
-                <span className="metric__value mono">{range.result.value.recommended} °C</span>
-              </div>
-              <div className="metric">
-                <span className="metric__label">Máximo</span>
-                <span className="metric__value mono">{range.result.value.max} °C</span>
-              </div>
-              <button type="button" className="btn btn--primary" onClick={() => onApplyAnnealing(range.result.value.recommended)}>
+              {(
+                [
+                  ['Mínimo', r.min, ''],
+                  ['Recomendado', r.recommended, 'metric--accent'],
+                  ['Máximo', r.max, ''],
+                ] as const
+              ).map(([label, value, cls]) => (
+                <div key={label} className={`metric ${cls}`}>
+                  <span className="metric__label">{label}</span>
+                  <span className="metric__value mono">{value} °C</span>
+                </div>
+              ))}
+              <button type="button" className="btn btn--primary btn--lg" onClick={() => applyAnnealing(r.recommended)}>
                 Aplicar al protocolo
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
 
-            {range.result.warnings && range.result.warnings.length > 0 && (
+            {!!range.result.warnings?.length && (
               <ul className="warnings">
                 {range.result.warnings.map(w => (
                   <li key={w}>
@@ -226,7 +200,7 @@ export function PrimerLab({ annealingTemperature, onApplyAnnealing }: PrimerLabP
         ) : (
           <p className="notice notice--warn">
             <TriangleAlert size={16} aria-hidden="true" />
-            {range.reason}
+            {!range.ok && range.reason}
           </p>
         )}
       </section>

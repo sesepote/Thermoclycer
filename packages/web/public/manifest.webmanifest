@@ -1,0 +1,11 @@
+{
+  "name": "ThermoCycler Sim — Simulador de PCR",
+  "short_name": "ThermoCycler",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07101d",
+  "theme_color": "#07101d",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

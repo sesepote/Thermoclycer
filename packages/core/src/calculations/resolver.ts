@@ -2,58 +2,45 @@ import { KnowledgeBase } from '../knowledge/knowledge-base';
 import { getPath } from '../rules/path';
 import { CalculationResult } from './types';
 
-export type CalculationFunction = (
-  args: Record<string, unknown>,
-  kb: KnowledgeBase,
-) => CalculationResult<unknown>;
+export type CalculationFunction = (args: Record<string, unknown>, kb: KnowledgeBase) => CalculationResult<unknown>;
 
 interface PendingCalculation {
   pendingCalculation: string;
   args: Record<string, unknown>;
 }
 
-function isPendingCalculation(value: unknown): value is PendingCalculation {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as Record<string, unknown>).pendingCalculation === 'string'
-  );
-}
+const isPending = (v: unknown): v is PendingCalculation =>
+  typeof v === 'object' && v !== null && typeof (v as PendingCalculation).pendingCalculation === 'string';
 
-// El motor de reglas (rules/engine.ts, acción "invoke") deja marcas de
-// "esto hay que calcularlo" en vez de calcularlo él mismo. Este
-// resolver recorre esas marcas y llama a la función de cálculo
-// registrada con ese nombre, sustituyendo la marca por el resultado.
+// El motor de reglas (acción "invoke") deja marcas de "esto hay que
+// calcularlo". Este resolver sustituye cada marca por el resultado de la
+// función registrada con ese nombre.
 export class CalculationResolver {
-  private registry = new Map<string, CalculationFunction>();
+  private readonly registry = new Map<string, CalculationFunction>();
 
-  register(name: string, fn: CalculationFunction): void {
+  register(name: string, fn: CalculationFunction): this {
     this.registry.set(name, fn);
+    return this;
   }
 
   resolve(facts: Record<string, unknown>, kb: KnowledgeBase): Record<string, unknown> {
-    const updated: Record<string, unknown> = { ...facts };
+    const updated = { ...facts };
 
-    for (const [key, value] of Object.entries(updated)) {
-      if (!isPendingCalculation(value)) continue;
+    for (const [key, value] of Object.entries(facts)) {
+      if (!isPending(value)) continue;
 
       const fn = this.registry.get(value.pendingCalculation);
       if (!fn) {
-        updated[key] = {
-          ok: false,
-          reason: `no hay ninguna función de cálculo registrada con el nombre "${value.pendingCalculation}"`,
-        };
+        updated[key] = { ok: false, reason: `no hay ninguna función de cálculo registrada con el nombre "${value.pendingCalculation}"` };
         continue;
       }
 
-      const resolvedArgs: Record<string, unknown> = {};
-      for (const [argName, argValue] of Object.entries(value.args)) {
-        // Los argumentos de la regla son rutas dentro de los propios
-        // "facts" (ver definitions/example-rules.ts), no valores literales.
-        resolvedArgs[argName] = typeof argValue === 'string' ? getPath(facts, argValue) ?? argValue : argValue;
-      }
-
-      updated[key] = fn(resolvedArgs, kb);
+      // Los argumentos de texto son rutas dentro de los propios facts;
+      // si la ruta no existe se pasa el literal tal cual.
+      const args = Object.fromEntries(
+        Object.entries(value.args).map(([k, v]) => [k, typeof v === 'string' ? getPath(facts, v) ?? v : v]),
+      );
+      updated[key] = fn(args, kb);
     }
 
     return updated;

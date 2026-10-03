@@ -8,61 +8,51 @@ import { Rule } from './entities/rule';
 import { Relationship, RelationType } from './relationships';
 import { Source } from '../types/common';
 
-// Todo lo que en la spec se llama "motor de conocimiento" (entidades +
-// propiedades + relaciones + reglas + protocolos + fuentes) vive aquí,
-// en un único repositorio en memoria. No hay lógica de negocio: eso es
-// del motor de reglas y del motor de cálculo (fases siguientes). Esto
-// solo guarda y consulta.
+// Colección genérica indexada por id. Añadir un tipo de entidad nuevo a
+// la base de conocimiento es declarar un campo más en KnowledgeBase,
+// sin repetir add/get/all por cada tipo.
+export class Collection<T extends { id: string }> {
+  private readonly items = new Map<string, T>();
 
-export class KnowledgeBase {
-  readonly version: string;
-
-  private primers = new Map<string, Primer>();
-  private polymerases = new Map<string, Polymerase>();
-  private buffers = new Map<string, Buffer>();
-  private chemistries = new Map<string, Chemistry>();
-  private assays = new Map<string, Assay>();
-  private protocols = new Map<string, Protocol>();
-  private rules = new Map<string, Rule>();
-  private sources = new Map<string, Source>();
-  private relationships: Relationship[] = [];
-
-  constructor(version: string) {
-    this.version = version;
+  add(...items: T[]): this {
+    for (const item of items) this.items.set(item.id, item);
+    return this;
   }
 
-  addPrimer(p: Primer) { this.primers.set(p.id, p); }
-  getPrimer(id: string) { return this.primers.get(id); }
-  allPrimers() { return [...this.primers.values()]; }
+  get(id: string | undefined): T | undefined {
+    return id === undefined ? undefined : this.items.get(id);
+  }
 
-  addPolymerase(p: Polymerase) { this.polymerases.set(p.id, p); }
-  getPolymerase(id: string) { return this.polymerases.get(id); }
-  allPolymerases() { return [...this.polymerases.values()]; }
+  all(): T[] {
+    return [...this.items.values()];
+  }
 
-  addBuffer(b: Buffer) { this.buffers.set(b.id, b); }
-  getBuffer(id: string) { return this.buffers.get(id); }
-  allBuffers() { return [...this.buffers.values()]; }
+  get size(): number {
+    return this.items.size;
+  }
+}
 
-  addChemistry(c: Chemistry) { this.chemistries.set(c.id, c); }
-  getChemistry(id: string) { return this.chemistries.get(id); }
-  allChemistries() { return [...this.chemistries.values()]; }
+// Repositorio en memoria de todo el "motor de conocimiento" (entidades,
+// relaciones, reglas, protocolos y fuentes). Solo guarda y consulta: la
+// lógica de negocio vive en los motores de reglas y de cálculo.
+export class KnowledgeBase {
+  readonly primers = new Collection<Primer>();
+  readonly polymerases = new Collection<Polymerase>();
+  readonly buffers = new Collection<Buffer>();
+  readonly chemistries = new Collection<Chemistry>();
+  readonly assays = new Collection<Assay>();
+  readonly protocols = new Collection<Protocol>();
+  readonly rules = new Collection<Rule>();
+  readonly sources = new Collection<Source>();
+  private readonly relationships: Relationship[] = [];
 
-  addAssay(a: Assay) { this.assays.set(a.id, a); }
-  getAssay(id: string) { return this.assays.get(id); }
-  allAssays() { return [...this.assays.values()]; }
+  constructor(readonly version: string) {}
 
-  addProtocol(p: Protocol) { this.protocols.set(p.id, p); }
-  getProtocol(id: string) { return this.protocols.get(id); }
-  allProtocols() { return [...this.protocols.values()]; }
+  /* ---------- Relaciones del grafo ---------- */
 
-  addRule(r: Rule) { this.rules.set(r.id, r); }
-  getRule(id: string) { return this.rules.get(id); }
-  activeRules() { return [...this.rules.values()].filter(r => r.activa); }
-
-  addSource(s: Source) { this.sources.set(s.id, s); }
-  getSource(id: string) { return this.sources.get(id); }
-
-  addRelationship(r: Relationship) { this.relationships.push(r); }
+  addRelationship(...relationships: Relationship[]): void {
+    this.relationships.push(...relationships);
+  }
 
   relationshipsFrom(id: string, type?: RelationType): Relationship[] {
     return this.relationships.filter(r => r.from === id && (!type || r.type === type));
@@ -72,35 +62,33 @@ export class KnowledgeBase {
     return this.relationships.filter(r => r.to === id && (!type || r.type === type));
   }
 
-  // Consultas de dominio, construidas encima de lo anterior. Estas son
-  // las que de verdad usará el resto del sistema (generador de
-  // ejercicios, evaluador, etc.), no las relaciones en crudo.
+  /* ---------- Consultas de dominio ---------- */
+
+  activeRules(): Rule[] {
+    return this.rules.all().filter(r => r.activa);
+  }
 
   getCompatibleBuffers(polymeraseId: string): Buffer[] {
-    const poly = this.getPolymerase(polymeraseId);
-    if (!poly?.buffersCompatibles) return [];
-    return poly.buffersCompatibles
-      .map(id => this.getBuffer(id))
-      .filter((b): b is Buffer => b !== undefined);
+    const ids = this.polymerases.get(polymeraseId)?.buffersCompatibles ?? [];
+    return ids.map(id => this.buffers.get(id)).filter((b): b is Buffer => b !== undefined);
   }
 
   isPolymeraseBufferCompatible(polymeraseId: string, bufferId: string): boolean {
     return this.getCompatibleBuffers(polymeraseId).some(b => b.id === bufferId);
   }
 
+  // Resuelve todos los ids de un ensayo a sus entidades completas.
   getAssayComponents(assayId: string) {
-    const assay = this.getAssay(assayId);
+    const assay = this.assays.get(assayId);
     if (!assay) return undefined;
     return {
       assay,
-      primerForward: this.getPrimer(assay.primerForward),
-      primerReverse: this.getPrimer(assay.primerReverse),
-      polymerase: this.getPolymerase(assay.polimerasa),
-      buffer: this.getBuffer(assay.buffer),
-      chemistry: this.getChemistry(assay.quimica),
-      referenceProtocol: assay.protocoloReferencia
-        ? this.getProtocol(assay.protocoloReferencia)
-        : undefined,
+      primerForward: this.primers.get(assay.primerForward),
+      primerReverse: this.primers.get(assay.primerReverse),
+      polymerase: this.polymerases.get(assay.polimerasa),
+      buffer: this.buffers.get(assay.buffer),
+      chemistry: this.chemistries.get(assay.quimica),
+      referenceProtocol: this.protocols.get(assay.protocoloReferencia),
     };
   }
 }

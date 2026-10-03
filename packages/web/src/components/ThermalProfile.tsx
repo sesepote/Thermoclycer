@@ -1,100 +1,97 @@
-import { useId, useMemo } from 'react';
+import { PointerEvent, memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Protocol } from '@thermocycler/core';
-import { formatDuration, temperatureColor } from '../lib/format';
+import { formatClock, formatDuration, temperatureColor } from '../lib/format';
+import { STEP_TYPE_LABELS } from '../lib/labels';
 
+// Coordenadas en unidades del viewBox (el SVG se estira al ancho disponible).
 const WIDTH = 1000;
 const HEIGHT = 260;
 const PAD_Y = 18;
 const MAX_T = 105;
-const HOLD_FRACTION = 0.05;
+const HOLD_FRACTION = 0.05; // ancho visual del hold, que en realidad es indefinido
+const RAMP_FRACTION = 0.0015; // pendiente visual entre segmentos
 const GRID_TEMPS = [4, 25, 50, 72, 95];
+const TOUCH_TOOLTIP_MS = 1500;
+
+/* ---------- Línea temporal del protocolo ---------- */
 
 interface Segment {
   start: number;
   end: number;
   temperature: number;
-}
-
-interface Band {
   label: string;
-  start: number;
-  end: number;
 }
 
-function buildTimeline(protocol: Protocol) {
-  const segments: Segment[] = [];
-  const bands: Band[] = [];
-  let t = 0;
-
-  const push = (duration: number, temperature: number) => {
-    segments.push({ start: t, end: t + duration, temperature });
-    t += duration;
-  };
-
-  if (protocol.initial) {
-    const start = t;
-    push(protocol.initial.durationSeconds, protocol.initial.temperature);
-    bands.push({ label: 'Inicial', start, end: t });
-  }
-
-  const cycleStart = t;
-  for (let c = 0; c < protocol.cycles.count; c++) {
-    for (const step of protocol.cycles.steps) push(step.durationSeconds, step.temperature);
-  }
-  bands.push({ label: `${protocol.cycles.count} ciclos`, start: cycleStart, end: t });
-
-  if (protocol.finalExtension) {
-    const start = t;
-    push(protocol.finalExtension.durationSeconds, protocol.finalExtension.temperature);
-    bands.push({ label: 'Ext. final', start, end: t });
-  }
-
-  const total = t;
-  const holdWidth = protocol.hold ? Math.max(total * HOLD_FRACTION, 1) : 0;
-  if (protocol.hold) {
-    segments.push({ start: total, end: total + holdWidth, temperature: protocol.hold.temperature });
-    bands.push({ label: 'Hold', start: total, end: total + holdWidth });
-  }
-
-  return { segments, bands, total, span: total + holdWidth };
+interface Timeline {
+  segments: Segment[]; // ordenados por tiempo, sin solapes
+  bands: { label: string; start: number; end: number }[];
+  total: number; // sin hold
+  span: number; // con el hold visual
+  line: string;
+  area: string;
 }
 
 const yFor = (temperature: number) => PAD_Y + (1 - temperature / MAX_T) * (HEIGHT - PAD_Y * 2);
+const safe = (seconds: number) => Math.max(0, seconds) || 0; // el borrador puede tener valores inválidos
 
-interface ThermalProfileProps {
-  protocol: Protocol;
-  isDraft: boolean;
-  elapsedSeconds: number;
-  active: boolean;
+// Se calcula una vez por protocolo (useMemo), no por frame.
+function buildTimeline({ initial, cycles, finalExtension, hold }: Protocol): Timeline {
+  const segments: Segment[] = [];
+  const bands: Timeline['bands'] = [];
+  let t = 0;
+  const push = (duration: number, temperature: number, label: string) => {
+    segments.push({ start: t, end: (t += safe(duration)), temperature, label });
+  };
+  const band = (label: string, fill: () => void) => {
+    const start = t;
+    fill();
+    bands.push({ label, start, end: t });
+  };
+
+  if (initial) band('Inicial', () => push(initial.durationSeconds, initial.temperature, 'Desnaturalización inicial'));
+  band(`${cycles.count} ciclos`, () => {
+    for (let c = 1; c <= cycles.count; c++) {
+      for (const s of cycles.steps) push(s.durationSeconds, s.temperature, `Ciclo ${c} · ${s.label || STEP_TYPE_LABELS[s.type]}`);
+    }
+  });
+  if (finalExtension) band('Ext. final', () => push(finalExtension.durationSeconds, finalExtension.temperature, 'Extensión final'));
+  const total = t;
+  if (hold) band('Hold', () => push(Math.max(total * HOLD_FRACTION, 1), hold.temperature, 'Mantenimiento'));
+  const span = t;
+
+  const x = (s: number) => (span > 0 ? (s / span) * WIDTH : 0).toFixed(2);
+  const ramp = span * RAMP_FRACTION;
+  const line = segments
+    .map((s, i) => {
+      const y = yFor(s.temperature).toFixed(2);
+      return `${i ? 'L' : 'M'}${x(i ? Math.min(s.start + ramp, s.end) : s.start)},${y} L${x(s.end)},${y}`;
+    })
+    .join(' ');
+
+  return { segments, bands, total, span, line, area: line && `${line} L${WIDTH},${HEIGHT} L0,${HEIGHT} Z` };
 }
 
-export function ThermalProfile({ protocol, isDraft, elapsedSeconds, active }: ThermalProfileProps) {
+// Búsqueda binaria del segmento que contiene un instante: O(log n) en
+// cada frame en vez de recorrer cientos de segmentos (ciclos × pasos).
+function segmentAt(segments: Segment[], seconds: number): Segment | undefined {
+  let lo = 0;
+  let hi = segments.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (segments[mid].end < seconds) lo = mid + 1;
+    else hi = mid;
+  }
+  return segments[lo];
+}
+
+/* ---------- Componente ---------- */
+
+// Vista previa del perfil del protocolo en edición.
+export const ThermalProfile = memo(function ThermalProfile({ protocol }: { protocol: Protocol }) {
   const gradientId = useId();
-  const clipId = useId();
-  const { segments, bands, total, span } = useMemo(() => buildTimeline(protocol), [protocol]);
-
-  const xFor = (seconds: number) => (span > 0 ? (seconds / span) * WIDTH : 0);
-
-  const linePath = useMemo(() => {
-    if (segments.length === 0) return '';
-    const rampWidth = span * 0.0015;
-    return segments
-      .map((s, i) => {
-        const x0 = xFor(i === 0 ? s.start : Math.min(s.start + rampWidth, s.end));
-        const x1 = xFor(s.end);
-        const y = yFor(s.temperature);
-        return `${i === 0 ? 'M' : 'L'}${x0.toFixed(2)},${y.toFixed(2)} L${x1.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(' ');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [segments, span]);
-
-  const areaPath = linePath ? `${linePath} L${WIDTH},${HEIGHT} L0,${HEIGHT} Z` : '';
-
-  const markerSeconds = elapsedSeconds >= total && protocol.hold ? total + (span - total) * 0.5 : elapsedSeconds;
-  const markerX = xFor(Math.min(markerSeconds, span));
-  const markerSegment = segments.find(s => markerSeconds >= s.start && markerSeconds <= s.end) ?? segments.at(-1);
-  const markerY = markerSegment ? yFor(markerSegment.temperature) : HEIGHT;
+  const timeline = useMemo(() => buildTimeline(protocol), [protocol]);
+  const { bands, total, span, line, area } = timeline;
+  const inspector = useInspector(timeline);
 
   return (
     <section className="card profile" aria-labelledby="profile-title">
@@ -106,12 +103,13 @@ export function ThermalProfile({ protocol, isDraft, elapsedSeconds, active }: Th
           </h2>
         </div>
         <div className="profile__meta">
-          {isDraft && <span className="tag tag--muted">Vista previa del borrador</span>}
+          <span className="tag tag--muted">Vista previa</span>
           <span className="tag">{formatDuration(total)} + hold</span>
         </div>
       </header>
 
-      <div className="profile__chart">
+      <div className="profile__chart" data-no-swipe>
+        {/* Eje Y */}
         <div className="profile__yaxis" aria-hidden="true">
           {GRID_TEMPS.map(t => (
             <span key={t} style={{ top: `${(yFor(t) / HEIGHT) * 100}%`, color: temperatureColor(t) }}>
@@ -120,54 +118,59 @@ export function ThermalProfile({ protocol, isDraft, elapsedSeconds, active }: Th
           ))}
         </div>
 
-        <svg
-          className="profile__svg"
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          preserveAspectRatio="none"
-          role="img"
-          aria-label={`Perfil térmico del protocolo: ${protocol.cycles.count} ciclos, duración ${formatDuration(total)}`}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={temperatureColor(95)} stopOpacity="0.9" />
-              <stop offset="45%" stopColor={temperatureColor(60)} stopOpacity="0.55" />
-              <stop offset="100%" stopColor={temperatureColor(4)} stopOpacity="0.15" />
-            </linearGradient>
-            <clipPath id={clipId}>
-              <rect x="0" y="0" width={active ? markerX : 0} height={HEIGHT} />
-            </clipPath>
-          </defs>
+        {/* Gráfica; se inspecciona pasando el ratón o arrastrando el dedo */}
+        <div className="profile__plot" {...inspector.handlers}>
+          <svg
+            className="profile__svg"
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={`Perfil térmico del protocolo: ${protocol.cycles.count} ciclos, duración ${formatDuration(total)}`}
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={temperatureColor(95)} stopOpacity="0.9" />
+                <stop offset="45%" stopColor={temperatureColor(60)} stopOpacity="0.55" />
+                <stop offset="100%" stopColor={temperatureColor(4)} stopOpacity="0.15" />
+              </linearGradient>
+            </defs>
 
-          {bands.map((b, i) => (
-            <rect
-              key={b.label}
-              x={xFor(b.start)}
-              y={0}
-              width={Math.max(0, xFor(b.end) - xFor(b.start))}
-              height={HEIGHT}
-              className={i % 2 === 0 ? 'profile__band' : 'profile__band profile__band--alt'}
-            />
-          ))}
+            {bands.map((b, i) => (
+              <rect
+                key={b.label}
+                x={(b.start / span) * WIDTH || 0}
+                y={0}
+                width={Math.max(0, ((b.end - b.start) / span) * WIDTH) || 0}
+                height={HEIGHT}
+                className={i % 2 ? 'profile__band profile__band--alt' : 'profile__band'}
+              />
+            ))}
+            {GRID_TEMPS.map(t => (
+              <line key={t} x1={0} x2={WIDTH} y1={yFor(t)} y2={yFor(t)} className="profile__grid" />
+            ))}
 
-          {GRID_TEMPS.map(t => (
-            <line key={t} x1={0} x2={WIDTH} y1={yFor(t)} y2={yFor(t)} className="profile__grid" />
-          ))}
+            <path d={area} fill={`url(#${gradientId})`} opacity={0.18} />
+            <path d={line} className="profile__line" vectorEffect="non-scaling-stroke" />
 
-          <path d={areaPath} fill={`url(#${gradientId})`} opacity={0.18} />
-          <path d={areaPath} fill={`url(#${gradientId})`} opacity={0.75} clipPath={`url(#${clipId})`} />
-          <path d={linePath} className="profile__line" vectorEffect="non-scaling-stroke" />
+            {inspector.point && (
+              <line x1={inspector.point.x} x2={inspector.point.x} y1={0} y2={HEIGHT} className="profile__inspect" vectorEffect="non-scaling-stroke" />
+            )}
+          </svg>
 
-          {active && (
-            <>
-              <line x1={markerX} x2={markerX} y1={0} y2={HEIGHT} className="profile__marker" vectorEffect="non-scaling-stroke" />
-              <circle cx={markerX} cy={markerY} r={5} className="profile__dot" vectorEffect="non-scaling-stroke" />
-            </>
+          {inspector.point && (
+            <div className="profile__tooltip" style={{ left: `${inspector.point.frac * 100}%`, transform: `translateX(-${inspector.point.frac * 100}%)` }}>
+              <strong className="mono" style={{ color: temperatureColor(inspector.point.segment.temperature) }}>
+                {inspector.point.segment.temperature} °C
+              </strong>
+              <span>{inspector.point.segment.label}</span>
+              <span className="mono muted">{inspector.point.seconds > total ? 'indefinido' : formatClock(inspector.point.seconds)}</span>
+            </div>
           )}
-        </svg>
+        </div>
 
         <div className="profile__bands" aria-hidden="true">
           {bands.map(b => (
-            <span key={b.label} style={{ width: `${((b.end - b.start) / span) * 100}%` }}>
+            <span key={b.label} style={{ width: `${((b.end - b.start) / span) * 100 || 0}%` }}>
               {b.label}
             </span>
           ))}
@@ -175,4 +178,51 @@ export function ThermalProfile({ protocol, isDraft, elapsedSeconds, active }: Th
       </div>
     </section>
   );
+});
+
+/* ---------- Inspección con ratón o dedo ---------- */
+
+interface InspectPoint {
+  frac: number;
+  x: number;
+  seconds: number;
+  segment: Segment;
+}
+
+// Ratón: sigue al cursor. Táctil/lápiz: sigue al dedo mientras arrastra
+// en horizontal (el vertical sigue siendo scroll por touch-action: pan-y)
+// y deja la lectura visible un momento al soltar.
+function useInspector({ segments, span }: Timeline) {
+  const [point, setPoint] = useState<InspectPoint | null>(null);
+  const hideTimer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(hideTimer.current), []);
+
+  const inspect = (e: PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const segment = segmentAt(segments, frac * span);
+    window.clearTimeout(hideTimer.current);
+    setPoint(segment ? { frac, x: frac * WIDTH, seconds: frac * span, segment } : null);
+  };
+  const hide = () => setPoint(null);
+
+  return {
+    point,
+    handlers: {
+      onPointerDown(e: PointerEvent<HTMLDivElement>) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        inspect(e);
+      },
+      onPointerMove(e: PointerEvent<HTMLDivElement>) {
+        if (e.pointerType === 'mouse' || e.buttons) inspect(e);
+      },
+      onPointerUp(e: PointerEvent<HTMLDivElement>) {
+        if (e.pointerType !== 'mouse') hideTimer.current = window.setTimeout(hide, TOUCH_TOOLTIP_MS);
+      },
+      onPointerLeave(e: PointerEvent<HTMLDivElement>) {
+        if (e.pointerType === 'mouse') hide();
+      },
+      onPointerCancel: hide,
+    },
+  };
 }

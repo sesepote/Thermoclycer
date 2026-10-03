@@ -1,42 +1,23 @@
-// Datos de ejemplo, solo para poder ejercitar la base de conocimiento
-// y los tests. NO son datos verificados de ningún fabricante o paper
-// real: son valores genéricos de manual, marcados como tal en "notas"
-// y con origin/fuente que lo deja claro. Cuando llegue la Fase 4
-// (motor de cálculo) y se cargue conocimiento real, esto se sustituye.
+// Datos de ejemplo para ejercitar la base de conocimiento y los tests.
+// NO son datos verificados de ningún fabricante o paper: son valores
+// genéricos de manual, marcados así en "fuente"/"notas".
 
 import { SourceType } from '../types/common';
 import { KnowledgeBase } from './knowledge-base';
-import { Primer } from './entities/primer';
-import { Polymerase } from './entities/polymerase';
-import { Buffer } from './entities/buffer';
-import { Chemistry } from './entities/chemistry';
-import { Assay } from './entities/assay';
-import { Protocol } from './entities/protocol';
 import { exampleRules } from '../rules/definitions/example-rules';
 
 export function buildDemoKnowledgeBase(): KnowledgeBase {
   const kb = new KnowledgeBase('0.1.0-demo');
+  const demo = { organismo: 'demo', genObjetivo: 'gen-demo', fuente: 'ejemplo interno, no verificado' };
 
-  const primerFwd: Primer = {
-    id: 'primer-fwd-demo',
-    nombre: 'Demo-FWD',
-    secuencia: 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG',
-    organismo: 'demo',
-    genObjetivo: 'gen-demo',
-    fuente: 'ejemplo interno, no verificado',
-    notas: 'Tm y %GC pendientes: los calcula el motor de cálculo (Fase 4), aquí no se inventan.',
-  };
+  /* ---------- Primers (Tm y %GC los calcula el motor de cálculo) ---------- */
+  kb.primers.add(
+    { id: 'primer-fwd-demo', nombre: 'Demo-FWD', secuencia: 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG', ...demo },
+    { id: 'primer-rev-demo', nombre: 'Demo-REV', secuencia: 'CTATCGGGCACCCTTTCAGCGGCCCATTACAATGGCCAT', ...demo },
+  );
 
-  const primerRev: Primer = {
-    id: 'primer-rev-demo',
-    nombre: 'Demo-REV',
-    secuencia: 'CTATCGGGCACCCTTTCAGCGGCCCATTACAATGGCCAT',
-    organismo: 'demo',
-    genObjetivo: 'gen-demo',
-    fuente: 'ejemplo interno, no verificado',
-  };
-
-  const polymerase: Polymerase = {
+  /* ---------- Reactivos ---------- */
+  kb.polymerases.add({
     id: 'poly-taq-demo',
     nombre: 'Taq genérica (demo)',
     tipo: 'hot-start',
@@ -52,25 +33,26 @@ export function buildDemoKnowledgeBase(): KnowledgeBase {
     requisitos: ['activación por calor 95°C'],
     buffersCompatibles: ['buffer-standard-demo'],
     fuente: 'genérico de literatura de PCR',
-  };
+  });
 
-  const buffer: Buffer = {
+  kb.buffers.add({
     id: 'buffer-standard-demo',
     nombre: 'Buffer estándar (demo)',
     composicion: { MgCl2: '1.5mM', KCl: '50mM', 'Tris-HCl': '10mM' },
     compatibilidades: ['poly-taq-demo'],
     fuente: 'genérico de literatura de PCR',
-  };
+  });
 
-  const chemistry: Chemistry = {
+  kb.chemistries.add({
     id: 'chem-endpoint-demo',
     nombre: 'PCR end-point (demo)',
     tipo: 'end-point',
     descripcion: 'Amplificación simple sin detección en tiempo real',
     fuente: 'genérico',
-  };
+  });
 
-  const protocol: Protocol = {
+  /* ---------- Protocolo de referencia (ejemplo de la sección 5 de la spec) ---------- */
+  kb.protocols.add({
     id: 'protocol-demo-3step',
     nombre: 'Protocolo demo de 3 pasos',
     initial: { temperature: 95, durationSeconds: 180 },
@@ -85,32 +67,26 @@ export function buildDemoKnowledgeBase(): KnowledgeBase {
     finalExtension: { temperature: 72, durationSeconds: 300 },
     hold: { temperature: 4 },
     fuente: 'ejemplo de la spec, sección 5',
-  };
+  });
 
-  const assay: Assay = {
+  /* ---------- Ensayo que une todo lo anterior por id ---------- */
+  kb.assays.add({
     id: 'assay-demo',
     nombre: 'Ensayo demo',
     tipoDePCR: 'end-point',
-    primerForward: primerFwd.id,
-    primerReverse: primerRev.id,
-    polimerasa: polymerase.id,
-    buffer: buffer.id,
-    quimica: chemistry.id,
-    protocoloReferencia: protocol.id,
-  };
+    primerForward: 'primer-fwd-demo',
+    primerReverse: 'primer-rev-demo',
+    polimerasa: 'poly-taq-demo',
+    buffer: 'buffer-standard-demo',
+    quimica: 'chem-endpoint-demo',
+    protocoloReferencia: 'protocol-demo-3step',
+  });
 
-  kb.addPrimer(primerFwd);
-  kb.addPrimer(primerRev);
-  kb.addPolymerase(polymerase);
-  kb.addBuffer(buffer);
-  kb.addChemistry(chemistry);
-  kb.addProtocol(protocol);
-  kb.addAssay(assay);
-
-  kb.addRelationship({ from: primerFwd.id, to: assay.objetivo ?? 'gen-demo', type: 'amplifica' });
-  kb.addRelationship({ from: polymerase.id, to: buffer.id, type: 'compatible_con' });
-
-  for (const rule of exampleRules) kb.addRule(rule);
+  kb.addRelationship(
+    { from: 'primer-fwd-demo', to: 'gen-demo', type: 'amplifica' },
+    { from: 'poly-taq-demo', to: 'buffer-standard-demo', type: 'compatible_con' },
+  );
+  kb.rules.add(...exampleRules);
 
   return kb;
 }
