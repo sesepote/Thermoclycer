@@ -1,7 +1,9 @@
 import { SetStateAction } from 'react';
 import { create } from 'zustand';
 import { Protocol } from '@thermocycler/core';
+import { useCyclerStore } from '../cycler/store';
 import { EditorState, buildProtocol, defaultEditorState, protocolToEditorState } from '../lib/editorState';
+import { fromCyclerProtocol } from '../lib/toCycler';
 import type { ViewId } from '../views';
 
 // Estado compartido de baja frecuencia: vista activa y borrador del
@@ -12,10 +14,12 @@ import type { ViewId } from '../views';
 interface AppState {
   view: string; // id crudo del hash; App lo resuelve contra el registro de vistas
   editor: EditorState;
+  dirty: boolean; // el usuario ya tocó el borrador; no se pisa con el programa del equipo
   draft: Protocol;
   annealingTemperature?: number;
   goTo: (view: ViewId) => void;
   setEditor: (update: SetStateAction<EditorState>) => void;
+  seedEditor: (editor: EditorState) => void;
   loadProtocol: (protocol: Protocol) => void;
   applyAnnealing: (temperature: number) => void;
 }
@@ -32,13 +36,15 @@ const withDraft = (editor: EditorState) => ({
 
 export const useApp = create<AppState>((set, get) => ({
   view: viewFromHash(),
+  dirty: false,
   ...withDraft(defaultEditorState()),
   goTo: next => {
     location.hash = `/${next}`;
   },
-  setEditor: update => set(s => withDraft(typeof update === 'function' ? update(s.editor) : update)),
+  setEditor: update => set(s => ({ dirty: true, ...withDraft(typeof update === 'function' ? update(s.editor) : update) })),
+  seedEditor: editor => set(withDraft(editor)),
   loadProtocol: protocol => {
-    set(withDraft(protocolToEditorState(protocol)));
+    set({ dirty: true, ...withDraft(protocolToEditorState(protocol)) });
     get().goTo('program');
   },
   applyAnnealing: temperature => {
@@ -48,3 +54,12 @@ export const useApp = create<AppState>((set, get) => ({
 }));
 
 addEventListener('hashchange', () => useApp.setState({ view: viewFromHash() }));
+
+// Al arrancar, el borrador del editor refleja el programa guardado en el
+// equipo. Si el usuario ya editó, no se sustituye.
+const seedFromMachine = () => {
+  if (useApp.getState().dirty) return;
+  useApp.getState().seedEditor(fromCyclerProtocol(useCyclerStore.getState().protocol));
+};
+if (useCyclerStore.persist.hasHydrated()) seedFromMachine();
+else useCyclerStore.persist.onFinishHydration(seedFromMachine);

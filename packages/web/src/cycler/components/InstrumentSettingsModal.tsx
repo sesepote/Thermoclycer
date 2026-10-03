@@ -123,7 +123,7 @@ export const InstrumentSettingsModal: React.FC<InstrumentSettingsModalProps> = (
               <span className="text-sm font-mono font-bold text-cyan-400">{volume} µL</span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Compensa la inercia térmica de los microtubos de 0.2 mL.
+              Referencia 50 µL. Con más volumen el bloque rampa más despacio; con menos, más rápido.
             </p>
             <div className="flex items-center gap-2 pt-1">
               {[10, 20, 25, 50, 100].map((v) => (

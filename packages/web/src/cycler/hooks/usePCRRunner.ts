@@ -1,13 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PCRProtocol, MachineRunState, RunProgressState } from '../types/pcr';
 import { playStepChime, playRunCompleteAlarm } from '../utils/audio';
+import { effectiveRampRate } from '../utils/gradient';
 
-interface UsePCRRunnerOptions {
-  protocol: PCRProtocol;
-  onComplete?: () => void;
-}
-
-export function usePCRRunner({ protocol, onComplete }: UsePCRRunnerOptions) {
+export function usePCRRunner({ protocol }: { protocol: PCRProtocol }) {
   const [state, setState] = useState<MachineRunState>('idle');
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [currentCycle, setCurrentCycle] = useState<number>(1);
@@ -59,47 +55,38 @@ export function usePCRRunner({ protocol, onComplete }: UsePCRRunnerOptions) {
     if (state === 'idle' || state === 'completed') return 0;
     if (activeStep?.isInfiniteHold) return 0;
 
+    // La rampa depende del salto de temperatura y del volumen de muestra.
+    let temp = currentBlockTemp;
     let totalSecondsLeft = 0;
-    const currentStepDuration = getStepDuration(currentStepIndex, currentCycle);
-    const currentStepLeft = Math.max(0, currentStepDuration - stepElapsedSeconds);
-    totalSecondsLeft += currentStepLeft;
+    const travel = (index: number, cycle: number, plateauSeconds: number) => {
+      const step = protocol.steps[index];
+      if (!step || step.isInfiniteHold) return;
+      const target = getStepTargetTemp(index, cycle);
+      totalSecondsLeft += Math.abs(target - temp) / effectiveRampRate(step.rampRate, protocol.sampleVolume) + plateauSeconds;
+      temp = target;
+    };
 
-    // Remaining steps in current cycle
+    travel(currentStepIndex, currentCycle, Math.max(0, getStepDuration(currentStepIndex, currentCycle) - stepElapsedSeconds));
+
     const loop = protocol.loops.find(
       (l) => currentStepIndex >= l.startStepIndex && currentStepIndex <= l.endStepIndex
     );
 
     if (loop) {
-      // remaining in this cycle
-      for (let i = currentStepIndex + 1; i <= loop.endStepIndex; i++) {
-        totalSecondsLeft += getStepDuration(i, currentCycle) + 10; // add ~10s average ramp
-      }
-      // remaining full cycles in this loop
+      for (let i = currentStepIndex + 1; i <= loop.endStepIndex; i++) travel(i, currentCycle, getStepDuration(i, currentCycle));
       const remainingCycles = loop.repeatCount - currentCycle;
-      if (remainingCycles > 0) {
-        let oneCycleDur = 0;
+      for (let c = 0; c < remainingCycles; c++) {
         for (let i = loop.startStepIndex; i <= loop.endStepIndex; i++) {
-          oneCycleDur += getStepDuration(i, currentCycle + 1) + 10;
-        }
-        totalSecondsLeft += oneCycleDur * remainingCycles;
-      }
-      // post-loop steps
-      for (let i = loop.endStepIndex + 1; i < protocol.steps.length; i++) {
-        if (!protocol.steps[i].isInfiniteHold) {
-          totalSecondsLeft += getStepDuration(i, 1) + 10;
+          travel(i, currentCycle + 1 + c, getStepDuration(i, currentCycle + 1 + c));
         }
       }
+      for (let i = loop.endStepIndex + 1; i < protocol.steps.length; i++) travel(i, 1, getStepDuration(i, 1));
     } else {
-      // outside loop
-      for (let i = currentStepIndex + 1; i < protocol.steps.length; i++) {
-        if (!protocol.steps[i].isInfiniteHold) {
-          totalSecondsLeft += getStepDuration(i, 1) + 10;
-        }
-      }
+      for (let i = currentStepIndex + 1; i < protocol.steps.length; i++) travel(i, 1, getStepDuration(i, 1));
     }
 
     return Math.max(0, Math.round(totalSecondsLeft));
-  }, [activeStep, currentStepIndex, currentCycle, stepElapsedSeconds, protocol, getStepDuration, state]);
+  }, [activeStep, currentBlockTemp, currentStepIndex, currentCycle, stepElapsedSeconds, protocol, getStepDuration, getStepTargetTemp, state]);
 
   // Start run
   const startRun = useCallback(() => {
@@ -179,9 +166,8 @@ export function usePCRRunner({ protocol, onComplete }: UsePCRRunnerOptions) {
       setState('completed');
       setIsRamping(false);
       playRunCompleteAlarm();
-      onComplete?.();
     }
-  }, [currentStepIndex, currentCycle, protocol, onComplete]);
+  }, [currentStepIndex, currentCycle, protocol]);
 
   // Simulation tick loop
   useEffect(() => {
@@ -235,12 +221,13 @@ export function usePCRRunner({ protocol, onComplete }: UsePCRRunnerOptions) {
 
       setCurrentBlockTemp((prevBlock) => {
         const deltaTemp = targetTemp - prevBlock;
-        const rampRate = (activeStep?.rampRate || 3.5) * simDeltaSec;
+        const rate = effectiveRampRate(activeStep?.rampRate, protocol.sampleVolume);
+        const rampRate = rate * simDeltaSec;
 
         if (Math.abs(deltaTemp) > 0.2) {
           // Still ramping to target temperature
           setIsRamping(true);
-          const vel = Math.sign(deltaTemp) * (activeStep?.rampRate || 3.5);
+          const vel = Math.sign(deltaTemp) * rate;
           setRampVelocity(Number(vel.toFixed(1)));
           return prevBlock + Math.sign(deltaTemp) * Math.min(Math.abs(deltaTemp), rampRate);
         } else {
@@ -321,7 +308,5 @@ export function usePCRRunner({ protocol, onComplete }: UsePCRRunnerOptions) {
     advanceStep,
     skipPreheatingLid,
     setSimSpeed,
-    setCurrentBlockTemp,
-    setCurrentLidTemp,
   };
 }

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { ProtocolEditor } from '../components/ProtocolEditor';
 import { ThermalProfile } from '../components/ThermalProfile';
 import { useCyclerStore } from '../cycler/store';
-import { toCyclerProtocol } from '../lib/toCycler';
+import { fromCyclerProtocol, toCyclerProtocol } from '../lib/toCycler';
 import { useApp } from '../state/app';
 import { isActiveRun, useInstrument } from '../state/instrument';
 
@@ -17,13 +17,18 @@ export default function ProgramView() {
   const locked = useInstrument(s => isActiveRun(s.run));
 
   const send = useCallback(() => {
-    useCyclerStore.getState().setProtocol(toCyclerProtocol(draft));
+    const machine = useCyclerStore.getState().protocol;
+    useCyclerStore.getState().setProtocol(toCyclerProtocol(draft, machine));
     goTo('run');
   }, [draft, goTo]);
 
+  const pull = useCallback(() => {
+    setEditor(fromCyclerProtocol(useCyclerStore.getState().protocol));
+  }, [setEditor]);
+
   return (
     <div className="program">
-      <ProtocolEditor state={editor} onChange={setEditor} onSave={send} locked={locked} />
+      <ProtocolEditor state={editor} onChange={setEditor} onSave={send} onPull={pull} locked={locked} />
       <div className="program__preview">
         <ThermalProfile protocol={draft} />
       </div>

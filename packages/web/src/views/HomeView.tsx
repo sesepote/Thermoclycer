@@ -4,6 +4,7 @@ import { PROTOCOL_PRESETS } from '../lib/editorState';
 import { formatClock, temperatureColor } from '../lib/format';
 import { knowledgeBase } from '../lib/knowledge';
 import { RUN_LABELS } from '../lib/labels';
+import { useCyclerStore } from '../cycler/store';
 import { useApp } from '../state/app';
 import { isActiveRun, useInstrument } from '../state/instrument';
 import { VIEWS } from '.';
@@ -93,13 +94,19 @@ function Telemetry() {
 
 // Programa del equipo y, si hay corrida, el paso, el ciclo y el tiempo restante.
 function ProgramSummary() {
-  const name = useInstrument(s => s.protocolName);
+  const storedName = useCyclerStore(s => s.protocol.name);
+  const storedCycles = useCyclerStore(s => s.protocol.loops[0]?.repeatCount ?? 0);
+  const liveName = useInstrument(s => s.protocolName);
   const run = useInstrument(s => s.run);
   const step = useInstrument(s => s.stepName);
   const cycle = useInstrument(s => s.cycle);
-  const cycles = useInstrument(s => s.totalCycles);
+  const liveCycles = useInstrument(s => s.totalCycles);
   const remaining = useInstrument(s => s.remainingSeconds);
   const active = isActiveRun(run);
+  // Antes de abrir el equipo, las lecturas en vivo aún no existen: se
+  // muestra el programa guardado.
+  const name = liveName ?? storedName;
+  const cycles = liveName ? liveCycles : storedCycles;
 
   return (
     <div className={`tele tele--program ${name ? '' : 'tele--empty'}`}>

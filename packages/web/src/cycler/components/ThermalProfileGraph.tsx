@@ -11,12 +11,17 @@ interface ThermalProfileGraphProps {
   onEditTime: (stepIndex: number) => void;
   onEditLoop: (loopIndex: number) => void;
   onOpenGradient: (stepIndex: number) => void;
+  onEditRamp?: (stepIndex: number) => void;
+  onEditTempIncrement?: (stepIndex: number) => void;
+  onEditTimeIncrement?: (stepIndex: number) => void;
   runProgress?: RunProgressState;
   isInteractive?: boolean;
 }
 
 // Etiquetas de temperatura/tiempo: son la única forma de editar un paso,
 // así que tienen área de toque ampliada y se activan también con teclado.
+const formatSigned = (value?: number) => (value ? (value > 0 ? `+${value}` : String(value)) : '0');
+
 function touchLabel(label: string, activate: () => void) {
   return {
     role: 'button',
@@ -43,6 +48,9 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
   onEditTime,
   onEditLoop,
   onOpenGradient,
+  onEditRamp,
+  onEditTempIncrement,
+  onEditTimeIncrement,
   runProgress,
   isInteractive = true,
 }) => {
@@ -480,26 +488,32 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
                   </g>
                 )}
 
-                {/* Touchdown Temp Increment delta (if present) */}
-                {geom.step.tempIncrement && (
-                  <g transform={`translate(${geom.midX}, ${svgHeight - 48})`}>
+                {/* Incremento de temperatura por ciclo */}
+                {geom.step.tempIncrement ? (
+                  <g transform={`translate(${geom.midX}, ${svgHeight - 48})`} {...touchLabel(`Incremento de temperatura del paso ${geom.idx + 1}`, () => isInteractive && onEditTempIncrement?.(geom.idx))}>
+                    <rect x="-28" y="-10" width="56" height="16" fill="transparent" />
                     <text x="0" y="0" textAnchor="middle" className="fill-emerald-400 font-mono text-[9px]">
                       Δ {geom.step.tempIncrement > 0 ? `+${geom.step.tempIncrement}` : geom.step.tempIncrement}°C
                     </text>
                   </g>
-                )}
+                ) : null}
 
-                {/* Ramp Rate label connecting steps */}
-                {geom.step.rampRate && (
-                  <text
-                    x={geom.plateauStartX - 8}
-                    y={geom.y + 12}
-                    textAnchor="end"
-                    className="fill-slate-600 font-mono text-[8px]"
-                  >
-                    {geom.step.rampRate}°C/s
+                {geom.step.timeIncrement ? (
+                  <g transform={`translate(${geom.midX}, ${geom.y + 40})`} {...touchLabel(`Incremento de tiempo del paso ${geom.idx + 1}`, () => isInteractive && onEditTimeIncrement?.(geom.idx))}>
+                    <rect x="-26" y="-9" width="52" height="14" fill="transparent" />
+                    <text x="0" y="0" textAnchor="middle" className="fill-emerald-400 font-mono text-[8px]">
+                      {geom.step.timeIncrement > 0 ? `+${geom.step.timeIncrement}` : geom.step.timeIncrement}s/ciclo
+                    </text>
+                  </g>
+                ) : null}
+
+                {/* Rampa: toque para editarla */}
+                <g transform={`translate(${geom.plateauStartX - 8}, ${geom.y + 12})`} {...touchLabel(`Rampa del paso ${geom.idx + 1}`, () => isInteractive && onEditRamp?.(geom.idx))}>
+                  <rect x="-36" y="-10" width="40" height="16" fill="transparent" />
+                  <text x="0" y="0" textAnchor="end" className="fill-slate-500 font-mono text-[8px]">
+                    {geom.step.rampRate ?? 3.5}°C/s
                   </text>
-                )}
+                </g>
               </g>
             );
           })}
@@ -554,7 +568,7 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
       </div>
 
       {/* Quick Step Inspector Bar (Bottom) */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-t border-slate-800 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-900 border-t border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-slate-400">Paso Seleccionado:</span>
           <span className="font-bold text-cyan-400 font-mono">
@@ -575,9 +589,31 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        {isInteractive && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => isInteractive && onOpenGradient(selectedStepIndex)}
+            type="button"
+            onClick={() => onEditRamp?.(selectedStepIndex)}
+            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px]"
+          >
+            Rampa {steps[selectedStepIndex]?.rampRate ?? 3.5}°C/s
+          </button>
+          <button
+            type="button"
+            onClick={() => onEditTempIncrement?.(selectedStepIndex)}
+            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px]"
+          >
+            ΔT {formatSigned(steps[selectedStepIndex]?.tempIncrement)}°C
+          </button>
+          <button
+            type="button"
+            onClick={() => onEditTimeIncrement?.(selectedStepIndex)}
+            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px]"
+          >
+            Δt {formatSigned(steps[selectedStepIndex]?.timeIncrement)}s
+          </button>
+          <button
+            onClick={() => onOpenGradient(selectedStepIndex)}
             className={`px-2.5 py-1 rounded border font-mono text-[11px] transition-colors flex items-center gap-1 ${
               steps[selectedStepIndex]?.gradient?.enabled
                 ? 'bg-orange-500/20 text-orange-300 border-orange-500/40 hover:bg-orange-500/30'
@@ -588,6 +624,7 @@ export const ThermalProfileGraph: React.FC<ThermalProfileGraphProps> = ({
             {steps[selectedStepIndex]?.gradient?.enabled ? 'Gradiente (Activo)' : 'Gradiente'}
           </button>
         </div>
+        )}
       </div>
     </div>
   );

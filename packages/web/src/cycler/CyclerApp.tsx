@@ -10,6 +10,7 @@ import { CycleLoopModal } from './components/CycleLoopModal';
 import { ProtocolLibraryModal } from './components/ProtocolLibraryModal';
 import { InstrumentSettingsModal } from './components/InstrumentSettingsModal';
 import { Plate96View } from './components/Plate96View';
+import { StepAdjustField, StepAdjustModal } from './components/StepAdjustModal';
 import { RunMonitorScreen } from './components/RunMonitorScreen';
 import { playConfirmBeep, playKeyClick } from './utils/audio';
 import { publishReadings } from '../state/instrument';
@@ -30,6 +31,7 @@ export default function CyclerApp() {
   // UI Selection & Modal State
   const [selectedStepIndex, setSelectedStepIndex] = useState<number>(1);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [adjustField, setAdjustField] = useState<StepAdjustField | null>(null);
   // Execution Engine
   const {
     progressState,
@@ -183,6 +185,25 @@ export default function CyclerApp() {
     setUserProtocols((prev) => prev.filter((p) => p.id !== id));
   };
 
+  // Rampa e incrementos por ciclo del paso seleccionado. 0 en un
+  // incremento lo quita del paso.
+  const openAdjust = (index: number, field: StepAdjustField) => {
+    setSelectedStepIndex(index);
+    setAdjustField(field);
+  };
+
+  const handleSaveAdjust = (value: number) => {
+    if (!adjustField) return;
+    const key = adjustField === 'ramp' ? 'rampRate' : adjustField;
+    const newSteps = [...protocol.steps];
+    const step = newSteps[selectedStepIndex];
+    if (!step) return;
+    const next = { ...step, [key]: value };
+    if (key !== 'rampRate' && value === 0) delete next[key];
+    newSteps[selectedStepIndex] = next;
+    setProtocol({ ...protocol, steps: newSteps });
+  };
+
   // Update Settings
   const handleUpdateSettings = (settings: {
     lidTemperature: number;
@@ -270,6 +291,9 @@ export default function CyclerApp() {
                 setSelectedStepIndex(idx);
                 setActiveModal('gradient');
               }}
+              onEditRamp={(idx) => openAdjust(idx, 'ramp')}
+              onEditTempIncrement={(idx) => openAdjust(idx, 'tempIncrement')}
+              onEditTimeIncrement={(idx) => openAdjust(idx, 'timeIncrement')}
               runProgress={progressState}
             />
           </div>
@@ -352,6 +376,17 @@ export default function CyclerApp() {
           protocol={protocol}
           onUpdateProtocolSettings={handleUpdateSettings}
           onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {adjustField && (
+        <StepAdjustModal
+          field={adjustField}
+          stepName={currentStep.name}
+          stepNumber={selectedStepIndex + 1}
+          value={adjustField === 'ramp' ? currentStep.rampRate ?? 3.5 : currentStep[adjustField] ?? 0}
+          onSave={handleSaveAdjust}
+          onClose={() => setAdjustField(null)}
         />
       )}
 

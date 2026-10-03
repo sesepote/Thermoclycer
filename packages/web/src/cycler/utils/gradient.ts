@@ -36,7 +36,19 @@ export function calculateGradientColumns(lowTemp: number, highTemp: number): Col
  * Returns an authentic scientific thermal colormap (HSL / Hex)
  * Range mapped: 4°C (icy indigo) to 95°C+ (deep crimson red)
  */
-export function getThermalColor(temperature: number): { bg: string; text: string; hex: string } {
+// La rampa programada es para 50 µL. Más volumen añade inercia y la
+// ralentiza; menos volumen la acelera, con la raíz para que el efecto
+// se note sin disparar la velocidad.
+const REFERENCE_VOLUME_UL = 50;
+
+export function effectiveRampRate(rampRate: number | undefined, sampleVolume: number): number {
+  const base = rampRate && rampRate > 0 ? rampRate : 3.5;
+  const volume = Math.min(100, Math.max(10, sampleVolume || REFERENCE_VOLUME_UL));
+  const factor = Math.sqrt(REFERENCE_VOLUME_UL / volume);
+  return Math.min(8, Math.max(0.4, Number((base * factor).toFixed(2))));
+}
+
+export function getThermalColor(temperature: number): { hex: string } {
   // Clamp between 4 and 100
   const clamped = Math.max(4, Math.min(100, temperature));
   const t = (clamped - 4) / (100 - 4); // 0 to 1
@@ -64,15 +76,7 @@ export function getThermalColor(temperature: number): { bg: string; text: string
     hue = 15 - (t - 0.8) * (15 / 0.2); // 15 -> 0
   }
 
-  // Determine good contrast text
-  const textColor = light > 40 && (hue > 40 && hue < 170) ? '#0f172a' : '#ffffff';
-  const hex = `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
-  
-  return {
-    bg: hex,
-    text: textColor,
-    hex,
-  };
+  return { hex: `hsl(${Math.round(hue)}, ${sat}%, ${light}%)` };
 }
 
 /**
@@ -88,19 +92,4 @@ export function formatDuration(seconds: number, isInfinite = false): string {
     return `${h}:${remM.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-/**
- * Parses "mm:ss" string to seconds
- */
-export function parseDurationString(str: string): number {
-  if (str === '∞' || str.toLowerCase() === 'inf') return 0;
-  const parts = str.split(':').map((p) => parseInt(p, 10));
-  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-    return parts[0] * 60 + parts[1];
-  }
-  if (parts.length === 1 && !isNaN(parts[0])) {
-    return parts[0];
-  }
-  return 30; // fallback 30s
 }

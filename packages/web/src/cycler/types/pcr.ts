@@ -65,5 +65,4 @@ export type ModalType =
   | 'cycle_loop' 
   | 'protocol_library' 
   | 'settings' 
-  | 'well_plate' 
-  | 'confirm_stop';
+  | 'well_plate';

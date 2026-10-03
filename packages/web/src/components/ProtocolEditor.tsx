@@ -1,5 +1,5 @@
 import { ReactNode, memo, useMemo } from 'react';
-import { CircleAlert, CircleCheck, Plus, Repeat, Save } from 'lucide-react';
+import { CircleAlert, CircleCheck, Download, Plus, Repeat, Save } from 'lucide-react';
 import { calculateTotalRuntime, cycleDuration, validateProtocol } from '@thermocycler/core';
 import { EditorPhase, EditorState, EditorStep, PROTOCOL_PRESETS, PhaseKey, buildProtocol, newStepId } from '../lib/editorState';
 import { cssVars, formatDuration, temperatureColor } from '../lib/format';
@@ -11,6 +11,7 @@ interface ProtocolEditorProps {
   state: EditorState;
   onChange: (next: EditorState) => void;
   onSave: () => void;
+  onPull: () => void; // copia el programa que hay ahora en el equipo
   locked: boolean; // el equipo está en marcha
 }
 
@@ -67,7 +68,7 @@ function PhaseBlock({ config: { title, temp, durationStep }, phase, disabled, on
 
 // memo: el editor es la parte más pesada del formulario y no debe
 // re-renderizarse por cambios ajenos (p. ej. el reloj de la simulación).
-export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, onSave, locked }: ProtocolEditorProps) {
+export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, onSave, onPull, locked }: ProtocolEditorProps) {
   const protocol = useMemo(() => buildProtocol(state), [state]);
   const validation = useMemo(() => validateProtocol(protocol), [protocol]);
   const runtime = useMemo(() => calculateTotalRuntime(protocol), [protocol]);
@@ -189,6 +190,10 @@ export const ProtocolEditor = memo(function ProtocolEditor({ state, onChange, on
           </ul>
         )}
 
+        <button type="button" className="btn btn--ghost btn--lg" onClick={onPull}>
+          <Download size={16} aria-hidden="true" />
+          Traer del termociclador
+        </button>
         <button type="button" className="btn btn--primary btn--lg" onClick={onSave} disabled={locked || !validation.valid}>
           <Save size={16} aria-hidden="true" />
           {locked ? 'Termociclador en marcha' : 'Cargar en el termociclador'}
